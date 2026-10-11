@@ -1,22 +1,26 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 def chunk_text(
     pages_data: List[Dict[str, Any]],
     course_id: int,
     document_id: int,
+    document_name: str = "",
     chunk_size: int = 400,
     overlap: int = 60
 ) -> List[Dict[str, Any]]:
     """
-    Splits page-by-page text into overlapping word chunks preserving course_id,
-    document_id, page number, and assigning unique chunk_id.
+    Splits page/slide/section units into overlapping word chunks.
+    Preserves course_id, document_id, document_name, unit_type, unit_number,
+    and assigns stable unique chunk_id.
     """
     chunks = []
     chunk_idx = 0
 
-    for page_entry in pages_data:
-        page_num = page_entry["page"]
-        text = page_entry["text"]
+    for unit_entry in pages_data:
+        unit_num = unit_entry.get("unit_number", unit_entry.get("page", 1))
+        unit_type = unit_entry.get("unit_type", "page")
+        heading = unit_entry.get("heading", f"{unit_type.capitalize()} {unit_num}")
+        text = unit_entry.get("text", "")
         words = text.split()
 
         if not words:
@@ -25,10 +29,14 @@ def chunk_text(
         if len(words) <= chunk_size:
             chunk_idx += 1
             chunks.append({
-                "chunk_id": f"c{course_id}_d{document_id}_p{page_num}_chk{chunk_idx}",
+                "chunk_id": f"c{course_id}_d{document_id}_u{unit_num}_chk{chunk_idx}",
                 "course_id": course_id,
                 "document_id": document_id,
-                "page": page_num,
+                "document_name": document_name,
+                "page": unit_num,
+                "unit_type": unit_type,
+                "unit_number": unit_num,
+                "heading": heading,
                 "text": " ".join(words)
             })
             continue
@@ -40,10 +48,14 @@ def chunk_text(
             chunk_idx += 1
 
             chunks.append({
-                "chunk_id": f"c{course_id}_d{document_id}_p{page_num}_chk{chunk_idx}",
+                "chunk_id": f"c{course_id}_d{document_id}_u{unit_num}_chk{chunk_idx}",
                 "course_id": course_id,
                 "document_id": document_id,
-                "page": page_num,
+                "document_name": document_name,
+                "page": unit_num,
+                "unit_type": unit_type,
+                "unit_number": unit_num,
+                "heading": heading,
                 "text": " ".join(chunk_words)
             })
 

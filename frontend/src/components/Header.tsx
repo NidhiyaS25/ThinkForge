@@ -2,11 +2,11 @@
 
 import React from 'react';
 import { Timer } from './Timer';
-import { ShieldCheck, ShieldAlert, BookOpen, GraduationCap, Sparkles, User } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, BookOpen, GraduationCap, Sparkles, User, HelpCircle } from 'lucide-react';
 
 interface HeaderProps {
-  currentView: 'hero' | 'workspace' | 'teacher' | 'profile' | 'arena';
-  onNavigate: (view: 'hero' | 'workspace' | 'teacher' | 'profile' | 'arena') => void;
+  currentView: 'hero' | 'workspace' | 'quizzes' | 'teacher' | 'profile' | 'arena';
+  onNavigate: (view: 'hero' | 'workspace' | 'quizzes' | 'teacher' | 'profile' | 'arena') => void;
   isFocused?: boolean;
   violationCount?: number;
   timerSeconds?: number;
@@ -82,10 +82,10 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Navigation Links */}
-        <nav className="flex items-center gap-1 sm:gap-4 text-xs sm:text-sm font-medium text-slate-700">
+        <nav className="flex items-center gap-1 sm:gap-3 text-xs sm:text-sm font-medium text-slate-700">
           <button
             onClick={() => onNavigate('workspace')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               currentView === 'workspace'
                 ? 'bg-[#113A35] text-white font-semibold'
                 : 'hover:text-[#113A35]'
@@ -95,8 +95,20 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <button
+            onClick={() => onNavigate('quizzes')}
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 ${
+              currentView === 'quizzes'
+                ? 'bg-[#113A35] text-white font-semibold'
+                : 'hover:text-[#113A35]'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+            <span>My Quizzes</span>
+          </button>
+
+          <button
             onClick={() => onNavigate('teacher')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               currentView === 'teacher'
                 ? 'bg-[#113A35] text-white font-semibold'
                 : 'hover:text-[#113A35]'
@@ -107,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onNavigate('profile')}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${
+            className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
               currentView === 'profile'
                 ? 'bg-[#113A35] text-white font-semibold'
                 : 'hover:text-[#113A35]'
@@ -118,7 +130,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={() => onNavigate('arena')}
-            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
               currentView === 'arena'
                 ? 'bg-gradient-to-r from-emerald-800 to-teal-800 text-white font-bold shadow-xs'
                 : 'text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/70 font-semibold'
@@ -138,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={() => onNavigate('hero')}
-              className="text-slate-500 hover:text-slate-800 px-3 py-1.5 text-xs"
+              className="text-slate-500 hover:text-slate-800 px-3 py-1.5 text-xs cursor-pointer"
             >
               Home
             </button>

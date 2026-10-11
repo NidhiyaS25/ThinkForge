@@ -11,9 +11,10 @@ import { IndependentChallenge } from '../components/IndependentChallenge';
 import { TeacherDashboard } from '../components/TeacherDashboard';
 import { IndependenceProfile } from '../components/IndependenceProfile';
 import { AlgorithmArena } from '../components/arena/AlgorithmArena';
+import { StudentQuizView } from '../components/StudentQuizView';
 import { useFocusMonitor } from '../hooks/useFocusMonitor';
 import { ragService } from '../lib/ragService';
-import { Compass } from 'lucide-react';
+import { Compass, BookOpen } from 'lucide-react';
 import {
   Assignment,
   CourseDocument,
@@ -24,7 +25,7 @@ import {
 } from '../types';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'hero' | 'workspace' | 'teacher' | 'profile' | 'arena'>('workspace');
+  const [currentView, setCurrentView] = useState<'hero' | 'workspace' | 'quizzes' | 'teacher' | 'profile' | 'arena'>('workspace');
 
   // Anti-Cheat Focus Monitor Hook
   const { isActive, violationCount, statusMessage } = useFocusMonitor({
@@ -314,11 +315,18 @@ export default function Home() {
           <AlgorithmArena onBack={() => setCurrentView('workspace')} />
         )}
 
+        {currentView === 'quizzes' && (
+          <StudentQuizView onOpenArena={() => setCurrentView('arena')} />
+        )}
+
         {currentView === 'teacher' && (
           <TeacherDashboard
             documents={documents}
             assignments={[assignment]}
             onUploadPDF={async (file) => {
+              if (file.name !== 'refresh_trigger') {
+                await ragService.uploadDocument(1, file);
+              }
               const newDocs = await ragService.getDocuments(1);
               setDocuments(newDocs);
             }}
@@ -355,13 +363,23 @@ export default function Home() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setCurrentView('arena')}
-                className="inline-flex items-center gap-2 bg-[#64D8B8] hover:bg-[#52cba9] text-[#0A2328] px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 shrink-0 cursor-pointer"
-              >
-                <span>Play Arena</span>
-                <span className="text-sm">→</span>
-              </button>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <button
+                  onClick={() => setCurrentView('quizzes')}
+                  className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Take Quizzes</span>
+                </button>
+
+                <button
+                  onClick={() => setCurrentView('arena')}
+                  className="inline-flex items-center gap-2 bg-[#64D8B8] hover:bg-[#52cba9] text-[#0A2328] px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 cursor-pointer"
+                >
+                  <span>Play Arena</span>
+                  <span className="text-sm">→</span>
+                </button>
+              </div>
             </div>
 
             {/* Defense Required Alert Banner (When anti-cheat anomaly is flagged) */}

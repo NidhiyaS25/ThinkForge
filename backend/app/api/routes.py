@@ -1,11 +1,16 @@
 import os
 import shutil
+import json
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from backend.app.db.session import get_db
-from backend.app.models.models import Course, Document, Assignment, Student, Attempt, HintHistory, Reflection, TransferResult, KnowledgeNode
+from backend.app.models.models import (
+    Course, Document, Assignment, Student, Attempt,
+    HintHistory, Reflection, TransferResult, KnowledgeNode,
+    Quiz, QuizQuestion, QuizAttempt, QuizAnswer
+)
 from backend.app.schemas.schemas import (
     CourseResponse, CourseCreate, DocumentResponse,
     AssignmentResponse, AssignmentCreate,
@@ -15,15 +20,21 @@ from backend.app.schemas.schemas import (
     TransferSubmitRequest, TransferSubmitResponse,
     EvaluationRequest, EvaluationResponse,
     DefenseVerifyRequest, DefenseVerifyResponse,
-    IndependenceMetricResponse
+    IndependenceMetricResponse,
+    QuizGenerateRequest, QuizGenerateResponse,
+    RegenerateQuestionRequest, QuizQuestionItem,
+    QuizSaveRequest, QuizResponse,
+    QuizAttemptSubmitRequest, QuizAttemptResultResponse
 )
 from backend.app.core.config import settings
-from backend.app.services.pdf_extraction import extract_text_from_pdf
+from backend.app.services.document_extraction import extract_document_content
 from backend.app.services.chunking import chunk_text
 from backend.app.services.vector_store import vector_store
 from backend.app.services.socratic_mentor import generate_socratic_hint
 from backend.app.services.rag_evaluator import evaluate_submission_integrity, verify_student_defense
 from backend.app.services.scoring import score_transfer_challenge
+from backend.app.services.quiz_generator import generate_rag_quiz, regenerate_single_question
+from backend.app.services.quiz_grading import evaluate_quiz_answers
 
 router = APIRouter(prefix="/api")
 
@@ -44,7 +55,7 @@ def create_course(course_in: CourseCreate, db: Session = Depends(get_db)):
     db.refresh(course)
     return course
 
-# DOCUMENTS / PDF RAG
+# DOCUMENTS / MULTI-FORMAT RAG INGESTION
 @router.get("/courses/{course_id}/documents", response_model=List[DocumentResponse])
 def list_documents(course_id: int, db: Session = Depends(get_db)):
     return db.query(Document).filter(Document.course_id == course_id).all()
@@ -55,27 +66,73 @@ async def upload_document(course_id: int, file: UploadFile = File(...), db: Sess
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF documents are supported.")
+    ext = os.path.splitext(file.filename)[1].lower()
+    allowed_exts = [".pdf", ".pptx", ".docx", ".txt", ".text", ".md", ".markdown"]
 
-    file_path = os.path.join(settings.UPLOAD_DIR, f"{course_id}_{file.filename}")
+    if ext == ".ppt":
+        raise HTTPException(
+            status_code=400,
+            detail="Legacy PowerPoint .ppt is not supported. Please convert your presentation to .pptx before uploading."
+        )
+
+    if ext not in allowed_exts:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format '{ext}'. Supported formats: .pdf, .pptx, .docx, .txt, .md"
+        )
+
+    # Save to upload dir
+    clean_filename = f"{course_id}_{os.path.basename(file.filename)}"
+    file_path = os.path.join(settings.UPLOAD_DIR, clean_filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
+    # File size validation (limit to 30MB)
+    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if size_mb > 30.0:
+        os.remove(file_path)
+        raise HTTPException(status_code=400, detail="File size exceeds maximum allowed limit of 30MB.")
+
     try:
-        pages = extract_text_from_pdf(file_path)
+        # Extract text preserving unit metadata
+        extraction_result = extract_document_content(file_path, file.filename)
+        unit_type = extraction_result["unit_type"]
+        unit_count = extraction_result["unit_count"]
+        units = extraction_result["units"]
+
+        # Generate preview
+        preview_text = "\n".join([u["text"] for u in units[:3]])[:800]
+
+        file_type_clean = ext.lstrip(".").lower()
+        if file_type_clean in ["text", "txt"]:
+            file_type_clean = "txt"
+        elif file_type_clean in ["markdown", "md"]:
+            file_type_clean = "md"
+
         doc = Document(
             course_id=course_id,
             filename=file.filename,
             storage_path=file_path,
-            page_count=len(pages),
+            file_type=file_type_clean,
+            unit_type=unit_type,
+            unit_count=unit_count,
+            page_count=unit_count,  # backward compatibility
+            extracted_preview=preview_text,
             status="indexing"
         )
         db.add(doc)
         db.commit()
         db.refresh(doc)
 
-        chunks = chunk_text(pages, course_id=course_id, document_id=doc.id)
+        # Chunk text
+        chunks = chunk_text(
+            pages_data=units,
+            course_id=course_id,
+            document_id=doc.id,
+            document_name=file.filename
+        )
+
+        # Index in ChromaDB
         vector_store.add_chunks(chunks)
 
         doc.chunk_count = len(chunks)
@@ -83,9 +140,51 @@ async def upload_document(course_id: int, file: UploadFile = File(...), db: Sess
         db.commit()
         db.refresh(doc)
         return doc
+    except ValueError as ve:
+        db.rollback()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to index PDF: {str(e)}")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(status_code=500, detail=f"Failed to process and index document: {str(e)}")
+
+@router.get("/documents/{document_id}/preview")
+def get_document_preview(document_id: int, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "file_type": doc.file_type,
+        "unit_type": doc.unit_type,
+        "unit_count": doc.unit_count,
+        "chunk_count": doc.chunk_count,
+        "preview": doc.extracted_preview or "No preview available"
+    }
+
+@router.delete("/documents/{document_id}")
+def delete_document(document_id: int, db: Session = Depends(get_db)):
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Remove vector chunks from ChromaDB
+    vector_store.delete_document_chunks(doc.id)
+
+    # Remove storage file if exists
+    if os.path.exists(doc.storage_path):
+        try:
+            os.remove(doc.storage_path)
+        except Exception:
+            pass
+
+    db.delete(doc)
+    db.commit()
+    return {"status": "success", "message": f"Document '{doc.filename}' and its vector records were deleted safely."}
 
 # ASSIGNMENTS
 @router.get("/assignments", response_model=List[AssignmentResponse])
@@ -120,7 +219,6 @@ def create_assignment(assign_in: AssignmentCreate, db: Session = Depends(get_db)
 # ATTEMPTS & REVISIONS
 @router.post("/attempts", response_model=AttemptResponse)
 def save_attempt(attempt_in: AttemptCreate, db: Session = Depends(get_db)):
-    # Check if there is an existing attempt
     existing = db.query(Attempt).filter(
         Attempt.assignment_id == attempt_in.assignment_id,
         Attempt.student_id == attempt_in.student_id
@@ -170,7 +268,6 @@ def request_hint(req: HintRequest, db: Session = Depends(get_db)):
         student_query=req.student_query
     )
 
-    # Persist hint history
     hint_record = HintHistory(
         attempt_id=attempt.id,
         level=req.level,
@@ -218,7 +315,6 @@ def evaluate_submission(req: EvaluationRequest, db: Session = Depends(get_db)):
         rubric=rubric
     )
 
-    # Update knowledge node if defense is required
     if eval_result["defense_required"] and eval_result["targeted_concept"]:
         node = db.query(KnowledgeNode).filter(
             KnowledgeNode.assignment_id == req.assignment_id,
@@ -314,7 +410,6 @@ def get_independence_metrics(student_id: int, db: Session = Depends(get_db)):
     total_violations = sum(a.focus_violations for a in attempts)
     initial_before_hint = len(attempts) > 0 and len(total_hints) <= 3
 
-    # Derive mastery level based on transfer score and hint reliance
     transfer_score = transfer.score if transfer else 0.0
     if transfer_score >= 80 and len(total_hints) <= 2:
         mastery = "High Independence (Forged Master)"
@@ -340,3 +435,281 @@ def get_independence_metrics(student_id: int, db: Session = Depends(get_db)):
 def get_knowledge_graph(assignment_id: int, db: Session = Depends(get_db)):
     nodes = db.query(KnowledgeNode).filter(KnowledgeNode.assignment_id == assignment_id).all()
     return [{"id": n.id, "name": n.concept_name, "status": n.status, "question": n.defense_question} for n in nodes]
+
+# ----------------- RAG QUIZ ENDPOINTS -----------------
+
+@router.post("/courses/{course_id}/quizzes/generate", response_model=QuizGenerateResponse)
+def generate_quiz(course_id: int, req: QuizGenerateRequest, db: Session = Depends(get_db)):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # Fetch selected documents
+    docs = db.query(Document).filter(
+        Document.course_id == course_id,
+        Document.id.in_(req.document_ids)
+    ).all()
+
+    if not docs:
+        raise HTTPException(status_code=400, detail="No valid documents selected for this course.")
+
+    docs_meta = [
+        {
+            "id": d.id,
+            "filename": d.filename,
+            "unit_type": d.unit_type,
+            "unit_count": d.unit_count,
+            "page_count": d.page_count,
+            "chunk_count": d.chunk_count
+        }
+        for d in docs
+    ]
+
+    generated_data = generate_rag_quiz(
+        course_id=course_id,
+        document_ids=[d.id for d in docs],
+        documents_meta=docs_meta,
+        topic=req.topic,
+        num_questions=req.num_questions,
+        difficulty=req.difficulty,
+        question_types=req.question_types,
+        feedback_policy=req.feedback_policy,
+        show_citations=req.show_citations,
+        include_explanations=req.include_explanations
+    )
+
+    return generated_data
+
+@router.post("/quizzes/regenerate-question")
+def regenerate_question(req: RegenerateQuestionRequest, db: Session = Depends(get_db)):
+    q = regenerate_single_question(
+        course_id=req.course_id,
+        document_ids=req.document_ids,
+        topic=req.topic,
+        question_type=req.question_type,
+        difficulty=req.difficulty,
+        current_question_text=req.current_question_text or ""
+    )
+    return q
+
+@router.post("/courses/{course_id}/quizzes", response_model=QuizResponse)
+def save_quiz(course_id: int, req: QuizSaveRequest, db: Session = Depends(get_db)):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    quiz = Quiz(
+        course_id=course_id,
+        title=req.title,
+        topic=req.topic,
+        difficulty=req.difficulty,
+        selected_document_ids=json.dumps(req.selected_document_ids),
+        selected_document_names=json.dumps(req.selected_document_names),
+        feedback_policy=req.feedback_policy,
+        show_citations=req.show_citations,
+        include_explanations=req.include_explanations,
+        status=req.status,
+        rag_trace=json.dumps(req.rag_trace)
+    )
+    db.add(quiz)
+    db.commit()
+    db.refresh(quiz)
+
+    # Save questions
+    for idx, q_data in enumerate(req.questions):
+        q = QuizQuestion(
+            quiz_id=quiz.id,
+            order=idx + 1,
+            question_type=q_data.question_type,
+            question_text=q_data.question_text,
+            options=json.dumps(q_data.options),
+            correct_answer=q_data.correct_answer,
+            explanation=q_data.explanation,
+            source_citation=q_data.source_citation,
+            source_excerpt=q_data.source_excerpt,
+            chunk_id=q_data.chunk_id or "",
+            retrieval_rank=q_data.retrieval_rank,
+            similarity_score=q_data.similarity_score,
+            generation_reason=q_data.generation_reason,
+            is_validated=q_data.is_validated
+        )
+        db.add(q)
+    db.commit()
+    db.refresh(quiz)
+
+    # Format response
+    questions_list = []
+    for q in quiz.questions:
+        opts = json.loads(q.options) if q.options else []
+        questions_list.append(QuizQuestionItem(
+            id=q.id,
+            question_text=q.question_text,
+            question_type=q.question_type,
+            options=opts,
+            correct_answer=q.correct_answer,
+            explanation=q.explanation,
+            source_citation=q.source_citation,
+            source_excerpt=q.source_excerpt,
+            chunk_id=q.chunk_id,
+            retrieval_rank=q.retrieval_rank,
+            similarity_score=q.similarity_score,
+            generation_reason=q.generation_reason,
+            is_validated=q.is_validated,
+            order=q.order
+        ))
+
+    return QuizResponse(
+        id=quiz.id,
+        course_id=quiz.course_id,
+        title=quiz.title,
+        topic=quiz.topic,
+        difficulty=quiz.difficulty,
+        selected_document_ids=json.loads(quiz.selected_document_ids) if quiz.selected_document_ids else [],
+        selected_document_names=json.loads(quiz.selected_document_names) if quiz.selected_document_names else [],
+        feedback_policy=quiz.feedback_policy,
+        show_citations=quiz.show_citations,
+        include_explanations=quiz.include_explanations,
+        status=quiz.status,
+        questions_count=len(questions_list),
+        rag_trace=json.loads(quiz.rag_trace) if quiz.rag_trace else {},
+        created_at=quiz.created_at,
+        questions=questions_list
+    )
+
+@router.get("/courses/{course_id}/quizzes", response_model=List[QuizResponse])
+def list_quizzes(course_id: int, db: Session = Depends(get_db)):
+    quizzes = db.query(Quiz).filter(Quiz.course_id == course_id).order_by(Quiz.created_at.desc()).all()
+    resp = []
+    for q in quizzes:
+        resp.append(QuizResponse(
+            id=q.id,
+            course_id=q.course_id,
+            title=q.title,
+            topic=q.topic,
+            difficulty=q.difficulty,
+            selected_document_ids=json.loads(q.selected_document_ids) if q.selected_document_ids else [],
+            selected_document_names=json.loads(q.selected_document_names) if q.selected_document_names else [],
+            feedback_policy=q.feedback_policy,
+            show_citations=q.show_citations,
+            include_explanations=q.include_explanations,
+            status=q.status,
+            questions_count=len(q.questions),
+            rag_trace=json.loads(q.rag_trace) if q.rag_trace else {},
+            created_at=q.created_at,
+            questions=[]
+        ))
+    return resp
+
+@router.get("/quizzes/{quiz_id}", response_model=QuizResponse)
+def get_quiz(quiz_id: int, db: Session = Depends(get_db)):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    questions_list = []
+    for q in quiz.questions:
+        opts = json.loads(q.options) if q.options else []
+        questions_list.append(QuizQuestionItem(
+            id=q.id,
+            question_text=q.question_text,
+            question_type=q.question_type,
+            options=opts,
+            correct_answer=q.correct_answer,
+            explanation=q.explanation,
+            source_citation=q.source_citation,
+            source_excerpt=q.source_excerpt,
+            chunk_id=q.chunk_id,
+            retrieval_rank=q.retrieval_rank,
+            similarity_score=q.similarity_score,
+            generation_reason=q.generation_reason,
+            is_validated=q.is_validated,
+            order=q.order
+        ))
+
+    return QuizResponse(
+        id=quiz.id,
+        course_id=quiz.course_id,
+        title=quiz.title,
+        topic=quiz.topic,
+        difficulty=quiz.difficulty,
+        selected_document_ids=json.loads(quiz.selected_document_ids) if quiz.selected_document_ids else [],
+        selected_document_names=json.loads(quiz.selected_document_names) if quiz.selected_document_names else [],
+        feedback_policy=quiz.feedback_policy,
+        show_citations=quiz.show_citations,
+        include_explanations=quiz.include_explanations,
+        status=quiz.status,
+        questions_count=len(questions_list),
+        rag_trace=json.loads(quiz.rag_trace) if quiz.rag_trace else {},
+        created_at=quiz.created_at,
+        questions=questions_list
+    )
+
+@router.post("/quizzes/{quiz_id}/attempts", response_model=QuizAttemptResultResponse)
+def submit_quiz_attempt(quiz_id: int, req: QuizAttemptSubmitRequest, db: Session = Depends(get_db)):
+    quiz = db.query(Quiz).filter(Quiz.id == quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    student = db.query(Student).filter(Student.id == req.student_id).first()
+    if not student:
+        student = db.query(Student).first()
+        student_id = student.id if student else 1
+    else:
+        student_id = student.id
+
+    # Grade attempt
+    eval_result = evaluate_quiz_answers(quiz.questions, req.answers)
+
+    # Persist attempt
+    attempt = QuizAttempt(
+        quiz_id=quiz.id,
+        student_id=student_id,
+        mode=req.mode,
+        score=eval_result["total_score"],
+        max_score=eval_result["max_score"],
+        status="submitted"
+    )
+    db.add(attempt)
+    db.commit()
+    db.refresh(attempt)
+
+    # Persist answers
+    for eval_item in eval_result["evaluations"]:
+        ans = QuizAnswer(
+            attempt_id=attempt.id,
+            question_id=eval_item["question_id"],
+            student_response=eval_item["student_response"],
+            is_correct=eval_item["is_correct"],
+            score=eval_item["score"],
+            feedback=eval_item["feedback"]
+        )
+        db.add(ans)
+    db.commit()
+
+    return {
+        "attempt_id": attempt.id,
+        "quiz_id": quiz.id,
+        "score": eval_result["total_score"],
+        "max_score": eval_result["max_score"],
+        "percentage": eval_result["percentage"],
+        "status": "submitted",
+        "mode": req.mode,
+        "answers": eval_result["evaluations"],
+        "created_at": attempt.submitted_at
+    }
+
+@router.get("/quizzes/{quiz_id}/attempts")
+def list_quiz_attempts(quiz_id: int, db: Session = Depends(get_db)):
+    attempts = db.query(QuizAttempt).filter(QuizAttempt.quiz_id == quiz_id).order_by(QuizAttempt.submitted_at.desc()).all()
+    return [
+        {
+            "id": a.id,
+            "student_id": a.student_id,
+            "mode": a.mode,
+            "score": a.score,
+            "max_score": a.max_score,
+            "percentage": round((a.score / max(1.0, a.max_score)) * 100.0, 1),
+            "submitted_at": a.submitted_at
+        }
+        for a in attempts
+    ]

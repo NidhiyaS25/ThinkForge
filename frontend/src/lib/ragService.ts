@@ -1,4 +1,13 @@
-import { Assignment, CourseDocument, IndependenceMetrics, KnowledgeNode } from '../types';
+import {
+  Assignment,
+  CourseDocument,
+  IndependenceMetrics,
+  KnowledgeNode,
+  Quiz,
+  QuizQuestionItem,
+  QuizAttemptResult,
+  RAGTraceInfo
+} from '../types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
@@ -45,12 +54,47 @@ export const ragService = {
         id: 1,
         course_id: 1,
         filename: 'Course_Notes_Recursion.pdf',
+        file_type: 'pdf',
+        unit_type: 'page',
+        unit_count: 18,
         page_count: 18,
         chunk_count: 12,
         status: 'indexed',
+        extracted_preview: 'Course Notes - Understanding Recursion and Call Stacks...',
         created_at: new Date().toISOString()
       }
     ];
+  },
+
+  async uploadDocument(courseId: number, file: File): Promise<CourseDocument> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_BASE}/courses/${courseId}/documents`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to upload and index document.');
+    }
+    return await res.json();
+  },
+
+  async deleteDocument(documentId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/documents/${documentId}`, {
+      method: 'DELETE'
+    });
+    if (!res.ok) {
+      throw new Error('Failed to delete document.');
+    }
+  },
+
+  async getDocumentPreview(documentId: number) {
+    const res = await fetch(`${API_BASE}/documents/${documentId}/preview`);
+    if (res.ok) return await res.json();
+    throw new Error('Could not fetch preview.');
   },
 
   async saveAttempt(assignmentId: number, code: string, focusViolations: number, timeSeconds: number) {
@@ -95,7 +139,6 @@ export const ragService = {
       });
       if (res.ok) return await res.json();
     } catch (e) {}
-    // Deterministic fallback matching reference mockup
     if (level === 1) {
       return {
         hint_text:
@@ -138,7 +181,6 @@ export const ragService = {
       });
       if (res.ok) return await res.json();
     } catch (e) {}
-    // Fallback logic
     const flagged = timeSeconds < 40 || focusViolations >= 2;
     return {
       flagged,
@@ -234,5 +276,108 @@ export const ragService = {
       transfer_score: 95,
       independent_mastery_level: 'High Independence (Forged Master)'
     };
+  },
+
+  // ----------------- RAG QUIZ SERVICE METHODS -----------------
+
+  async generateQuiz(payload: {
+    course_id: number;
+    document_ids: number[];
+    title: string;
+    topic: string;
+    num_questions: number;
+    difficulty: string;
+    question_types: string[];
+    feedback_policy: string;
+    show_citations: boolean;
+    include_explanations: boolean;
+  }): Promise<{ title: string; topic: string; difficulty: string; questions: QuizQuestionItem[]; rag_trace: RAGTraceInfo }> {
+    const res = await fetch(`${API_BASE}/courses/${payload.course_id}/quizzes/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.detail || 'Failed to generate quiz with RAG.');
+    }
+    return await res.json();
+  },
+
+  async regenerateQuestion(payload: {
+    course_id: number;
+    document_ids: number[];
+    topic: string;
+    question_type: string;
+    difficulty: string;
+    current_question_text: string;
+  }): Promise<QuizQuestionItem> {
+    const res = await fetch(`${API_BASE}/quizzes/regenerate-question`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      throw new Error('Failed to regenerate question.');
+    }
+    return await res.json();
+  },
+
+  async saveQuiz(payload: {
+    course_id: number;
+    title: string;
+    topic: string;
+    difficulty: string;
+    selected_document_ids: number[];
+    selected_document_names: string[];
+    feedback_policy: string;
+    show_citations: boolean;
+    include_explanations: boolean;
+    status: 'draft' | 'published';
+    rag_trace: RAGTraceInfo;
+    questions: QuizQuestionItem[];
+  }): Promise<Quiz> {
+    const res = await fetch(`${API_BASE}/courses/${payload.course_id}/quizzes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) {
+      throw new Error('Failed to save quiz.');
+    }
+    return await res.json();
+  },
+
+  async getQuizzes(courseId: number = 1): Promise<Quiz[]> {
+    try {
+      const res = await fetch(`${API_BASE}/courses/${courseId}/quizzes`);
+      if (res.ok) return await res.json();
+    } catch (e) {}
+    return [];
+  },
+
+  async getQuiz(quizId: number): Promise<Quiz> {
+    const res = await fetch(`${API_BASE}/quizzes/${quizId}`);
+    if (!res.ok) {
+      throw new Error('Failed to fetch quiz details.');
+    }
+    return await res.json();
+  },
+
+  async submitQuizAttempt(quizId: number, answers: Record<number, string>, mode: 'practice' | 'assessment' = 'assessment'): Promise<QuizAttemptResult> {
+    const res = await fetch(`${API_BASE}/quizzes/${quizId}/attempts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        quiz_id: quizId,
+        student_id: 1,
+        mode,
+        answers
+      })
+    });
+    if (!res.ok) {
+      throw new Error('Failed to submit quiz attempt.');
+    }
+    return await res.json();
   }
 };
