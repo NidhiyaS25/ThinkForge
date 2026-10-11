@@ -50,10 +50,10 @@ export const DistanceTable: React.FC<DistanceTableProps> = ({
           <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
             {nodes.map((node) => {
               const isCurrent = node.id === currentNodeId;
-              const isVisited = visitedNodeIds.has(node.id);
-              const isCandidate = candidateNodeIds.has(node.id);
-              const dist = distances[node.id];
-              const prev = previous[node.id];
+              const isVisited = visitedNodeIds?.has(node.id) ?? false;
+              const isCandidate = candidateNodeIds?.has(node.id) ?? false;
+              const dist = distances?.[node.id];
+              const prev = previous?.[node.id];
 
               let rowBg = 'hover:bg-slate-50';
               if (isCurrent) rowBg = 'bg-teal-50/70 font-semibold';
@@ -71,7 +71,7 @@ export const DistanceTable: React.FC<DistanceTableProps> = ({
                     </span>
                   </td>
                   <td className="py-2 px-3">
-                    {dist === Infinity ? (
+                    {dist === undefined || dist === null || dist === Infinity ? (
                       <span className="text-slate-400">∞</span>
                     ) : (
                       <span

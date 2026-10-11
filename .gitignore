@@ -21,6 +21,7 @@ dist/
 .next/
 out/
 coverage/
+*.tsbuildinfo
 
 # Local app data and uploads
 backend/data/

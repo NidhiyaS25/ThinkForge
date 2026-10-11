@@ -158,10 +158,10 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             const isSource = node.id === sourceNodeId;
             const isDest = node.id === destNodeId;
             const isCurrent = node.id === currentNodeId;
-            const isVisited = visitedNodeIds.has(node.id);
-            const isCandidate = candidateNodeIds.has(node.id);
-            const dist = distances[node.id];
-            const distLabel = dist === Infinity ? '∞' : dist.toString();
+            const isVisited = visitedNodeIds?.has(node.id) ?? false;
+            const isCandidate = candidateNodeIds?.has(node.id) ?? false;
+            const dist = distances?.[node.id];
+            const distLabel = dist === undefined || dist === null || dist === Infinity ? '∞' : dist.toString();
 
             // Node visual styling
             let circleFill = '#1E293B'; // slate-800

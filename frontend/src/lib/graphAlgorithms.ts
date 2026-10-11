@@ -167,12 +167,12 @@ export function runFullDijkstra(challenge: GraphChallenge) {
     let current: string | null = null;
     let minDistance = Infinity;
 
-    for (const nodeId of unvisited) {
+    unvisited.forEach((nodeId) => {
       if (distances[nodeId] < minDistance) {
         minDistance = distances[nodeId];
         current = nodeId;
       }
-    }
+    });
 
     if (!current || minDistance === Infinity) break;
 

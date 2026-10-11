@@ -40,6 +40,22 @@ interface AlgorithmArenaProps {
 type GameMode = 'dijkstra_path' | 'build_algorithm' | 'edge_selection';
 type Difficulty = 'easy' | 'medium' | 'hard';
 
+const getInitialDistances = (diff: Difficulty): Record<string, number> => {
+  const d: Record<string, number> = {};
+  GRAPH_CHALLENGES[diff].nodes.forEach((n) => {
+    d[n.id] = n.id === GRAPH_CHALLENGES[diff].source ? 0 : Infinity;
+  });
+  return d;
+};
+
+const getInitialPrevious = (diff: Difficulty): Record<string, string | null> => {
+  const p: Record<string, string | null> = {};
+  GRAPH_CHALLENGES[diff].nodes.forEach((n) => {
+    p[n.id] = null;
+  });
+  return p;
+};
+
 export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   // Mode & Difficulty
   const [gameMode, setGameMode] = useState<GameMode>('dijkstra_path');
@@ -60,11 +76,11 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
 
   // Mode A: Dijkstra Live Game State
-  const [distances, setDistances] = useState<Record<string, number>>({});
-  const [previous, setPrevious] = useState<Record<string, string | null>>({});
+  const [distances, setDistances] = useState<Record<string, number>>(() => getInitialDistances('easy'));
+  const [previous, setPrevious] = useState<Record<string, string | null>>(() => getInitialPrevious('easy'));
   const [visitedNodeIds, setVisitedNodeIds] = useState<Set<string>>(new Set());
   const [currentNodeId, setCurrentNodeId] = useState<string | null>(null);
-  const [candidateNodeIds, setCandidateNodeIds] = useState<Set<string>>(new Set());
+  const [candidateNodeIds, setCandidateNodeIds] = useState<Set<string>>(() => new Set([GRAPH_CHALLENGES['easy'].source]));
   const [relaxedEdgeIds, setRelaxedEdgeIds] = useState<Set<string>>(new Set());
   const [pathEdgeIds, setPathEdgeIds] = useState<Set<string>>(new Set());
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -186,7 +202,11 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
         const v = newPath[newPath.length - 1];
         const edge = challenge.edges.find((e) => (e.u === u && e.v === v) || (e.u === v && e.v === u));
         if (edge) {
-          setPathEdgeIds((prev) => new Set([...prev, edge.id]));
+          setPathEdgeIds((prev) => {
+            const next = new Set(prev);
+            next.add(edge.id);
+            return next;
+          });
         }
       }
 
@@ -314,7 +334,11 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
       // Improved!
       setDistances((prev) => ({ ...prev, [neighborId]: tentativeDist }));
       setPrevious((prev) => ({ ...prev, [neighborId]: currentNodeId }));
-      setRelaxedEdgeIds((prev) => new Set([...prev, edgeId]));
+      setRelaxedEdgeIds((prev) => {
+        const next = new Set(prev);
+        next.add(edgeId);
+        return next;
+      });
       setScore((s) => s + 10);
 
       setGuidanceMessage({
@@ -336,7 +360,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     if (!currentNodeId) return;
 
     const finalizedId = currentNodeId;
-    const newVisited = new Set([...visitedNodeIds, finalizedId]);
+    const newVisited = new Set(visitedNodeIds);
+    newVisited.add(finalizedId);
     setVisitedNodeIds(newVisited);
     setCurrentNodeId(null);
     setCandidateNodeIds(new Set());
