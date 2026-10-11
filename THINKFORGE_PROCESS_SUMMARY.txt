@@ -1,233 +1,373 @@
 ================================================================================
-THINKFORGE (SOCRATICLMS) — COMPLETE END-TO-END EXECUTION & PROCESS SUMMARY REPORT
+THINKFORGE (SOCRATICLMS & ALGORITHM ARENA) — MASTER PROJECT SUMMARY & PROCESS REPORT
 ================================================================================
 Date: October 11, 2026
 Repository: https://github.com/NidhiyaS25/ThinkForge
-Project: ThinkForge — AI-Powered Learning for Independent Thinkers
-Tagline: "Don't replace thinking. Forge it."
+Project Name: ThinkForge — AI-Powered Learning for Independent Thinkers
+Primary Tagline: "Don't replace thinking. Forge it."
 Supporting Brand Line: "An AI that trains you to need it less."
+Positioning: Educational technology platform and anti-cheat learning environment with 
+             interactive algorithmic problem solving.
 
---------------------------------------------------------------------------------
+================================================================================
 TABLE OF CONTENTS
---------------------------------------------------------------------------------
-1. EXECUTIVE PROJECT OVERVIEW
-2. REQUIREMENT SPECIFICATIONS & SYSTEM ARCHITECTURE
-3. DESIGN SYSTEM & HERO REFERENCE ALIGNMENT
-4. TECH STACK & FILE-BY-FILE IMPLEMENTATION MAP
-5. CORE COMPONENT & SERVICE HIGHLIGHTS
-   5.1. Focus Lock & Window Tracking (useFocusMonitor.ts)
-   5.2. Pacing Controller & Dynamic Timer (Timer.tsx)
-   5.3. Socratic Interrogator & Progressive Mentor (SocraticChat.tsx)
-   5.4. Visual Knowledge Graph (KnowledgeGraph.tsx)
-   5.5. Interactive Assessment Workspace & Page Layout (page.tsx)
-   5.6. AI-Disabled Transfer Challenge (IndependentChallenge.tsx)
-   5.7. Teacher Management & Independence Profile
-   5.8. Backend Services & RAG Vector Engine
-6. LOCAL RUNTIME CONFIGURATION & RESOLUTION
-7. TESTING, VALIDATION & LIVE DEPLOYMENT
-8. GIT INITIALIZATION & GITHUB SYNCHRONIZATION
-9. CURRENT SYSTEM STATUS & VERIFICATION LOG
-
 ================================================================================
 1. EXECUTIVE PROJECT OVERVIEW
-================================================================================
-ThinkForge is an educational technology platform and anti-cheat learning management 
-system designed to solve a critical flaw in modern AI education: student dependency 
-on instant AI answers.
-
-Unlike typical chatbots that act as answer vending machines, ThinkForge enforces:
-1. Attempt-Before-Hint: Students must commit an initial answer before AI guidance is 
-   unlocked.
-2. Progressive Socratic Fading: AI guidance follows 3 structured levels:
-   - Level 1: Clarifying Question
-   - Level 2: Conceptual Hint (grounded in course notes)
-   - Level 3: Partial Scaffolding Outline (leaving final synthesis to the learner)
-3. Socratic Defense Interrogation: If submissions are flagged as suspiciously fast, 
-   generic, or interrupted by tab-switches, the UI enters "DEFENSE REQUIRED" mode, 
-   requiring the student to explain intermediate execution steps.
-4. AI-Disabled Independent Transfer: Authentic mastery is measured through a related 
-   transfer problem where all AI assistance is completely locked.
-
-================================================================================
-2. REQUIREMENT SPECIFICATIONS & SYSTEM ARCHITECTURE
-================================================================================
-The project was designed with a decoupled full-stack architecture:
-
-- Frontend: Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons, 
-  and Framer Motion.
-- Backend: Python 3.13, FastAPI REST API, Uvicorn ASGI server, SQLAlchemy ORM, and 
-  SQLite embedded database.
-- Course Knowledge & RAG Layer: PyMuPDF (fitz) page-by-page PDF extraction, 400-word 
-  sliding window chunking, SentenceTransformers (all-MiniLM-L6-v2) local 384-d dense 
-  embeddings, ChromaDB persistent vector storage, and Google GenAI SDK (Gemini) with 
-  deterministic fallback.
-- State & Telemetry: Custom React hooks tracking window focus, blur, and tab switching 
-  in real-time.
+2. FULL-STACK ARCHITECTURE & TECHNOLOGY MATRIX
+3. VISUAL DESIGN SYSTEM & BRAND TOKENS
+4. COMPLETE FEATURE BREAKDOWN
+   4.1. Attempt-Before-Hint Workspace
+   4.2. Progressive Socratic AI Mentor (3 Assistance Tiers)
+   4.3. Anti-Cheat Integrity Engine & Real-Time Focus Monitor
+   4.4. Dynamic Pacing Controller
+   4.5. Interactive Concept Knowledge Graph
+   4.6. AI-Disabled Independent Transfer Challenge
+   4.7. Teacher Dashboard & RAG Course Knowledge Pipeline
+   4.8. Independence Profile & Mastery Audit Trail
+5. ALGORITHM ARENA — INTERACTIVE MINI-GAME INTEGRATION
+   5.1. Overview & Pedagogical Purpose
+   5.2. Game Mode A: Dijkstra's Path Challenge
+   5.3. Game Mode B: Build the Algorithm (Step Sequencing)
+   5.4. Game Mode C: Edge Selection Challenge
+   5.5. Interactive SVG Graph Canvas & Live Distance Table
+   5.6. Two-Phase Path Solving Workflow & Auto-Trace Engine
+   5.7. Difficulty Progression & Graph Datasets
+   5.8. Scoring, Efficiency Bonus & High Score Engine
+6. FILE-BY-FILE ARCHITECTURAL DIRECTORY TREE
+7. DIAGNOSED ISSUES, ROOT CAUSES & RESOLUTIONS
+8. LOCAL RUNTIME CONFIGURATION & POWERSHELL COMMANDS
+9. AUTOMATED TEST SUITE & VERIFICATION LOG
+10. GIT INITIALIZATION & GITHUB COMMIT AUDIT TRAIL
 
 ================================================================================
-3. DESIGN SYSTEM & HERO REFERENCE ALIGNMENT
+1. EXECUTIVE PROJECT OVERVIEW
 ================================================================================
-The user provided a visual reference image (ThinkForge hero section and split workspace 
-card). The entire frontend was built to strictly match this visual identity:
+Modern generative AI in education creates a dangerous failure mode: student cognitive 
+dependency. Students copy and paste prompts into chatbots and receive ready-made answers, 
+bypassing the productive struggle required to develop deep understanding.
 
-- Color Tokens:
-  - Deep Navy/Dark Teal: #0F2E2E, #113A35
-  - Forest Green / Teal Accents: #1F5F50, #2E7A68, #40916C
-  - Background: Warm Off-White / Cream (#FAF9F5, #FAF8F5)
-  - Surface Cards: #FFFFFF with subtle borders (#E2E8F0) and soft realistic shadows
-- Typography:
-  - Headlines: Newsreader / Editorial Serif
-  - UI Controls: Plus Jakarta Sans / Modern Sans
-  - Code Editor: Monospace with line numbering (1 to 7)
-- Hero Components:
-  - Overline: "— BUILD INDEPENDENT THINKERS"
-  - Headline: "Don't Replace Thinking. Forge It." (with "Forge It." in forest green)
-  - Split Workspace Mockup Card: Sidebar navigation ("My Learning", "Assignments", 
-    "Study Materials", "Progress"), code editor ("Understanding Recursion"), AI Mentor 
-    card with citation pill ("Course Notes - Page 12 >"), and Independent Challenge card.
+ThinkForge ("Don't replace thinking. Forge it.") transforms AI from an "answer vending 
+machine" into a strict pedagogical coach that trains students to need AI less.
 
-================================================================================
-4. TECH STACK & FILE-BY-FILE IMPLEMENTATION MAP
-================================================================================
-The project was modularly structured into 44 clean source files:
-
-ROOT:
-- .gitignore                      : Excludes secrets (.env), .venv, node_modules, .next, and data
-- .env.example                    : Safe template for environment variables
-- README.md                       : Comprehensive architecture and tech stack guide
-- Agents.md                       : Product specifications and rules
-- THINKFORGE_PROCESS_SUMMARY.txt  : Complete execution record
-
-BACKEND (backend/):
-- backend/.env.example            : Backend environment template
-- backend/.env                    : Local configuration (ignored by git)
-- backend/requirements.txt        : Python dependencies (FastAPI, Uvicorn, SQLAlchemy, etc.)
-- backend/app/main.py             : FastAPI entrypoint with CORS & startup seeding
-- backend/app/core/config.py      : Pydantic Settings configuration
-- backend/app/db/session.py       : SQLAlchemy SQLite session factory
-- backend/app/db/init_db.py       : Database initialization and CS 101 seed data
-- backend/app/models/models.py    : SQLAlchemy models (Course, Assignment, Attempt, KnowledgeNode)
-- backend/app/schemas/schemas.py  : Pydantic request & response schemas
-- backend/app/api/routes.py       : REST API routes (/api/attempts, /api/mentor/hint, etc.)
-- backend/app/services/pdf_extraction.py   : PyMuPDF PDF parser preserving page numbers
-- backend/app/services/chunking.py         : 400-word text chunker with overlap
-- backend/app/services/vector_store.py     : ChromaDB & MiniLM embedding store
-- backend/app/services/rag_evaluator.py    : Anti-cheat pacing & defense evaluator
-- backend/app/services/socratic_mentor.py  : Progressive Level 1/2/3 hint generator
-- backend/app/services/scoring.py          : Deterministic rubric scorer
-- backend/tests/test_api.py       : Automated test suite
-
-FRONTEND (frontend/):
-- frontend/package.json           : Next.js, React, Tailwind, Lucide dependencies
-- frontend/tsconfig.json          : TypeScript compiler options
-- frontend/tailwind.config.js     : Custom ThinkForge brand palette
-- frontend/postcss.config.js      : PostCSS configuration
-- frontend/next.config.mjs        : Next.js settings
-- frontend/src/types/index.ts     : TypeScript domain types
-- frontend/src/app/globals.css    : Tailwind directives & Google Fonts
-- frontend/src/app/layout.tsx     : Next.js root layout with typography
-- frontend/src/app/page.tsx       : Main assessment dashboard coordinating all modules
-- frontend/src/hooks/useFocusMonitor.ts            : Anti-cheat window tracking hook
-- frontend/src/components/Timer.tsx               : Dynamic pacing controller
-- frontend/src/components/SocraticChat.tsx        : AI dialog & interrogation interface
-- frontend/src/components/KnowledgeGraph.tsx      : Visual concept verification map
-- frontend/src/components/AssignmentViewer.tsx    : Left column code editor & rubric
-- frontend/src/components/DefenseBanner.tsx       : Socratic defense warning banner
-- frontend/src/components/IndependentChallenge.tsx: AI-disabled transfer challenge
-- frontend/src/components/HeroSection.tsx         : ThinkForge hero presentation
-- frontend/src/components/Header.tsx              : Brand bar with live focus badge
-- frontend/src/components/TeacherDashboard.tsx    : PDF upload & assignment creator
-- frontend/src/components/IndependenceProfile.tsx : Transparent evidence audit trail
-- frontend/src/lib/ragService.ts                  : Client API abstraction with fallbacks
+Core Tenets:
+1. Attempt-First Enforcement: No AI hints can be requested until the learner commits an 
+   initial, timestamped solution attempt.
+2. Progressive Socratic Fading: AI guidance follows three strict, grounded tiers (Clarifying 
+   Question -> Conceptual Principle -> Partial Scaffold). Direct solutions are NEVER given.
+3. Anti-Cheat Defense Interrogation: Real-time telemetry detects rapid pastes, tab switches, 
+   and window unfocus events, locking submissions into "DEFENSE REQUIRED" mode where students 
+   must explain execution mechanics.
+4. Independent Transfer Verification: Authentic mastery is proven on a related problem with 
+   all AI capabilities disabled.
+5. Algorithmic Arena: An interactive graph and puzzle laboratory ("Algorithm Arena") where 
+   students solve pathfinding, edge relaxation, and sequencing challenges hands-on.
 
 ================================================================================
-5. CORE COMPONENT & SERVICE HIGHLIGHTS
+2. FULL-STACK ARCHITECTURE & TECHNOLOGY MATRIX
 ================================================================================
-5.1. useFocusMonitor.ts (Custom Hook)
-- Listens to document visibilitychange, window blur, and focus events.
-- Flags violations whenever the student minimizes the window or switches tabs.
-- Increments violationCount and emits telemetry to the parent workspace.
+Frontend:
+- Framework: Next.js 14 (App Router) + React 18 + TypeScript
+- Styling: Tailwind CSS (Editorial academic palette with dark teal, emerald & cream)
+- Iconography: Lucide React
+- Visual Canvas: Interactive custom SVG rendering with dynamic node states, pulsing aura, 
+  and weighted edge styling
+- State & Telemetry: Custom React hooks for window focus/blur monitoring, dynamic pacing, 
+  and Dijkstra graph traversals
+- Persistence: LocalStorage for high scores and session state; Fetch API for backend sync
 
-5.2. Timer.tsx (Pacing Controller)
-- Calculates expected time dynamically based on algorithmic complexity (intermediate = 420s).
-- Renders MM:SS countdown with dynamic color state transitions (emerald -> amber -> rose).
-- Penalizes timer by 30 seconds for every focus violation.
-
-5.3. SocraticChat.tsx (Socratic Dialogue & Interrogation)
-- Renders progressive assistance pills: L1 (Clarifying), L2 (Conceptual), L3 (Outline).
-- Shows citation chips: "Course Notes - Page 12 >".
-- Switches to Socratic Interrogator when an integrity anomaly is detected, prompting:
-  "Defense Required: In your implementation, what exact memory state change occurs 
-  when n == 0 is evaluated? Walk through the return sequence from factorial(1) to factorial(n)."
-
-5.4. KnowledgeGraph.tsx (Concept Verification Map)
-- Visualizes key concept nodes:
-  - Base Case Formulation (Verified)
-  - Recursive Sub-problem (Verified)
-  - Call Stack Unwinding (Pending Defense -> Defense Required -> Verified)
-  - Edge Case Guard Rails (Pending)
-- Dynamically flips to "Verified" when the student passes Socratic interrogation.
-
-5.5. AssignmentViewer.tsx & page.tsx
-- Rich editor with line numbers, character count, and revision versioning (Attempt v1, v2).
-- Enforces initial attempt submission before hints unlock.
-- Includes a metacognitive reasoning reflection input.
-
-5.6. IndependentChallenge.tsx
-- Presents related transfer challenge ("Pure recursive fibonacci(n) without loops").
-- Displays high-visibility "AI Disabled" badge.
-- Scores responses deterministically against expected boundary criteria.
+Backend:
+- Runtime: Python 3.13 (x64 Windows)
+- API Framework: FastAPI with Uvicorn ASGI Server
+- Data Validation: Pydantic & Pydantic-Settings
+- Database: SQLAlchemy ORM with SQLite (data/thinkforge.db)
+- Text Extraction: PyMuPDF (fitz) for page-by-page PDF ingestion
+- Embeddings: SentenceTransformers (all-MiniLM-L6-v2, 384-dimensional dense vectors)
+- Vector Database: ChromaDB with persistent local storage
+- LLM Integration: Google GenAI Python SDK (Gemini) with deterministic pedagogical fallback
 
 ================================================================================
-6. LOCAL RUNTIME CONFIGURATION & RESOLUTION
+3. VISUAL DESIGN SYSTEM & BRAND TOKENS
 ================================================================================
-During setup on the Windows environment, several environmental hurdles were 
-diagnosed and resolved:
-1. Python Runtime: Located existing Python 3.13 at 
-   C:\Users\niran\AppData\Local\Programs\Python\Python313\python.exe.
-2. Node.js & npm: Portable Node.js v20.18.0 and npm 10.8.2 were downloaded and extracted 
-   to C:\Users\niran\AppData\Local\Programs\nodejs.
-3. System Environment PATH: Both Python and Node.js were appended to the user PATH.
-4. Port Conflict on 8000: Diagnosed a stale background Python process bound to port 8000; 
-   safely terminated it and cleanly launched Uvicorn.
-5. HuggingFace Model Weights: Initialized SentenceTransformers and cached all-MiniLM-L6-v2 
-   embeddings locally.
+The entire application follows an editorial academic aesthetic inspired by classic 
+scientific publishing, clean minimalism, and focused typography:
+
+Color Palette:
+- Deep Primary Teal: #0F2E2E / #113A35 (Depth, authority, navigation headers)
+- Forest / Mint Accents: #1F5F50, #2DD4BF, #64D8B8 (Active nodes, progress, buttons)
+- Warm Canvas Background: #FAF9F5 / #FAF8F5 (High legibility, soft eye comfort)
+- Crisp Surface Cards: #FFFFFF with subtle borders (#E2E8F0) and soft realistic shadows
+- Text Hierarchy: Deep slate (#0F172A) for body, muted slate (#64748B) for labels
+
+Typography:
+- Headlines & Wordmark: Newsreader / Editorial Serif
+- Controls & Interface: Plus Jakarta Sans / Inter
+- Code & Algorithm Tables: JetBrains Mono / Monospace tabular numbers
 
 ================================================================================
-7. TESTING, VALIDATION & LIVE DEPLOYMENT
+4. COMPLETE FEATURE BREAKDOWN
 ================================================================================
-- Backend Server: Live on http://127.0.0.1:8000 (Health check 200 OK).
-- Interactive OpenAPI Console: Live on http://127.0.0.1:8000/docs.
-- Frontend Application: Live on http://localhost:3000 (HTTP 200 OK).
-- Backend Automated Tests (backend/tests/test_api.py):
-  * test_health_check (PASSED)
-  * test_chunking_metadata_preservation (PASSED)
-  * test_mentor_progressive_hint_levels (PASSED)
-  * test_anti_cheat_evaluation_and_defense_trigger (PASSED)
-  * test_socratic_defense_verification (PASSED)
-  * test_deterministic_transfer_scoring (PASSED)
-  * test_get_assignments_and_independence_profile (PASSED)
+4.1. Attempt-Before-Hint Workspace (AssignmentViewer.tsx & page.tsx)
+- Code editor with line numbers (1-7), character counting, and attempt versioning (v1, v2).
+- AI Mentor panel is physically locked until the student submits an initial attempt.
+- Includes a dedicated reflection input for metacognitive reasoning before final submission.
+
+4.2. Progressive Socratic AI Mentor (SocraticChat.tsx & socratic_mentor.py)
+- Level 1 — Clarifying Question: Asks what the student tried and redirects attention.
+- Level 2 — Conceptual Hint: Explains underlying principles grounded in course materials.
+- Level 3 — Partial Outline: Provides scaffolding while leaving synthesis to the learner.
+- Grounded Citations: Renders clickable chips referencing uploaded materials (e.g. "Course Notes - Page 12 >").
+
+4.3. Anti-Cheat Integrity Engine (useFocusMonitor.ts & DefenseBanner.tsx)
+- Tracks document visibilitychange, window blur, and focus loss events.
+- Penalizes pacing timers by 30 seconds for external window departures.
+- Automatically triggers "DEFENSE REQUIRED" interrogation upon suspicious pacing or tab shifts.
+
+4.4. Dynamic Pacing Controller (Timer.tsx)
+- Calculates target solution time based on assignment complexity (intermediate = 420s).
+- Visual MM:SS countdown with dynamic emerald -> amber -> rose threshold transitions.
+
+4.5. Interactive Concept Knowledge Graph (KnowledgeGraph.tsx)
+- Renders visual graph nodes: Base Case, Recursive Sub-problem, Call Stack Unwinding, Edge Cases.
+- Nodes transition dynamically from "Pending" to "Defense Required" to "Verified" upon passing defense questions.
+
+4.6. AI-Disabled Independent Transfer Challenge (IndependentChallenge.tsx)
+- Presents a related transfer problem (e.g., pure recursive Fibonacci without loops).
+- High-visibility "AI Disabled" badge reinforces that no hints or mentor calls exist.
+- Evaluated with deterministic rubric criteria to measure true mastery.
+
+4.7. Teacher Dashboard & RAG Course Knowledge (TeacherDashboard.tsx & Backend Services)
+- Teachers upload text-based PDFs with real-time indexing status.
+- PyMuPDF extracts text page by page; chunking service slices text into 400-word windows.
+- SentenceTransformers embeds chunks; ChromaDB indexes vectors for filtered retrieval.
+
+4.8. Independence Profile (IndependenceProfile.tsx)
+- Transparent audit trail tracking hint usage, focus violations, and transfer performance.
+- Avoids fake vanity metrics; displays raw evidence of student independence.
 
 ================================================================================
-8. GIT INITIALIZATION & GITHUB SYNCHRONIZATION
+5. ALGORITHM ARENA — INTERACTIVE MINI-GAME INTEGRATION
 ================================================================================
-1. Addressed Root Git Trap: Detected that the user's home directory had an unintended 
-   parent .git folder; initialized an isolated, clean Git repository directly inside 
-   the ThinkForge workspace.
-2. Secret & Build Hygiene: Verified with git status --ignored that .env, backend/.env, 
-   .venv, node_modules, and .next were strictly excluded.
-3. Initial Commit: Committed 44 files (6,403 lines of code) with commit message:
-   "feat: initial commit for ThinkForge (SocraticLMS) prototype" (0be5984).
-4. Remote Configuration: Linked remote origin to:
-   https://github.com/NidhiyaS25/ThinkForge.git
-5. Authentication & Push: Handled GitHub authentication via Git Credential Manager, 
-   resolved upstream empty README conflict, and force-updated main branch.
+5.1. Overview & Pedagogical Purpose
+Integrated directly into ThinkForge under the navigation bar and hero section:
+- Tagline: "Think Strategically. Solve Algorithmically."
+- Teaches graph traversal, edge relaxation, and greedy decision-making through interactive play.
+
+5.2. Game Mode A: Dijkstra's Path Challenge
+- Displays weighted graphs (5 to 9 nodes) with clearly readable weights.
+- Player selects the source node (dist = 0) and unvisited candidate with minimum distance.
+- Player relaxes outgoing edges to update tentative distances and predecessors in real time.
+- Finalizes nodes once all outgoing edges have been explored.
+- Invariant rules prevent selecting invalid unvisited nodes or finalized nodes.
+
+5.3. Game Mode B: Build the Algorithm
+- Presents 7 shuffled algorithm steps:
+  * Initialize source distance to 0, all others to infinity
+  * Select unvisited node with minimum tentative distance
+  * Examine all unvisited neighbors of the active node
+  * Calculate tentative distance through active node
+  * Relax edge if smaller distance is discovered
+  * Mark current node as finalized/visited
+  * Repeat until target is finalized, then reconstruct path
+- Player reorders steps using Move Up / Move Down buttons; system validates the sequence.
+
+5.4. Game Mode C: Edge Selection Challenge
+- Decision-making graph puzzles testing algorithmic judgment:
+  * Identifying the next valid edge to relax
+  * Finding edges that cannot belong to the shortest path tree
+  * Selecting the next node to finalize
+
+5.5. Interactive SVG Graph Canvas & Live Distance Table
+- Custom SVG canvas (GraphCanvas.tsx) featuring:
+  * Node circles with status coloring (Teal = Active, Emerald = Finalized, Sky = Candidate)
+  * Active node pulsing aura animation
+  * Clickable weighted edges with highlighted shortest path tree
+- Live Distance Table (DistanceTable.tsx) featuring:
+  * Real-time columns: Node, Tentative Distance, Predecessor, Status badge
+  * Status badges: Active (pulse), Finalized (check), Candidate (clock), Unvisited
+
+5.6. Two-Phase Path Solving Workflow & Auto-Trace Engine
+- Phase 1: Interactive Edge Relaxation & Distance Table population.
+- Phase 2: Shortest Path Reconstruction:
+  * Dedicated Step 2 Path Reconstruction card with live sequence badges:
+    Sequence: [ A ] -> [ C ] -> [ B ] -> [ D ] -> [ E ]
+  * "⚡ Auto-Trace from Table": Traces backwards from target via predecessor pointers 
+    (E <- D <- B <- C <- A) and automatically completes the sequence.
+  * Undo & Clear controls to modify node clicks.
+  * Incomplete Path Guard: Prevents accidental submission when sequence is incomplete.
+
+5.7. Difficulty Progression & Graph Datasets
+- Easy (5 nodes: A, B, C, D, E | Source: A, Target: E | Optimal: A->C->B->D->E, Cost: 10)
+- Medium (7 nodes: A, B, C, D, E, F, G | Source: A, Target: G | Optimal: A->B->E->G, Cost: 10)
+- Hard (9 nodes: A through I | Source: A, Target: I | Optimal: A->C->F->H->I, Cost: 15)
+
+5.8. Scoring & High Score Engine
+- +10 points for successful edge relaxation
+- +5 points for finalizing a node
+- +30 points for submitting the correct shortest path
+- Up to +20 points efficiency bonus for solving with minimal errors
+- -5 points penalty for hints
+- High scores persisted in browser LocalStorage by difficulty tier.
 
 ================================================================================
-9. CURRENT SYSTEM STATUS & VERIFICATION LOG
+6. FILE-BY-FILE ARCHITECTURAL DIRECTORY TREE
 ================================================================================
-- GitHub Status: Remote repository is 100% in sync with commit 0be5984.
-- Remote URL: https://github.com/NidhiyaS25/ThinkForge
-- Local Servers: Both Frontend (port 3000) and Backend (port 8000) are running.
-- Readiness: The project is fully demonstrable, runnable, and ready for evaluation.
+ThinkForge/
+├── .env.example
+├── .gitignore
+├── Agents.md
+├── README.md
+├── THINKFORGE_PROCESS_SUMMARY.txt
+│
+├── backend/
+│   ├── .env.example
+│   ├── requirements.txt
+│   ├── app/
+│   │   ├── main.py
+│   │   ├── core/config.py
+│   │   ├── db/
+│   │   │   ├── session.py
+│   │   │   └── init_db.py
+│   │   ├── models/models.py
+│   │   ├── schemas/schemas.py
+│   │   ├── api/routes.py
+│   │   └── services/
+│   │       ├── pdf_extraction.py
+│   │       ├── chunking.py
+│   │       ├── vector_store.py
+│   │       ├── rag_evaluator.py
+│   │       ├── socratic_mentor.py
+│   │       └── scoring.py
+│   └── tests/
+│       └── test_api.py
+│
+└── frontend/
+    ├── package.json
+    ├── tsconfig.json
+    ├── tailwind.config.js
+    ├── postcss.config.js
+    ├── next.config.mjs
+    └── src/
+        ├── app/
+        │   ├── globals.css
+        │   ├── layout.tsx
+        │   └── page.tsx
+        ├── types/index.ts
+        ├── hooks/
+        │   └── useFocusMonitor.ts
+        ├── lib/
+        │   ├── ragService.ts
+        │   └── graphAlgorithms.ts
+        └── components/
+            ├── Header.tsx
+            ├── HeroSection.tsx
+            ├── AssignmentViewer.tsx
+            ├── SocraticChat.tsx
+            ├── KnowledgeGraph.tsx
+            ├── DefenseBanner.tsx
+            ├── IndependentChallenge.tsx
+            ├── TeacherDashboard.tsx
+            ├── IndependenceProfile.tsx
+            ├── Timer.tsx
+            └── arena/
+                ├── AlgorithmArena.tsx
+                ├── GraphCanvas.tsx
+                └── DistanceTable.tsx
+
+================================================================================
+7. DIAGNOSED ISSUES, ROOT CAUSES & RESOLUTIONS
+================================================================================
+Issue 1: TypeError: Cannot read properties of undefined (reading 'toString')
+- Location: frontend/src/components/arena/GraphCanvas.tsx (line 164)
+- Root Cause: In AlgorithmArena.tsx, distances was initialized as {} on mount. The resetGame() 
+  function ran in useEffect after the first render. On frame 0, distances['A'] was undefined. 
+  Additionally, isCandidate was checked without being defined from candidateNodeIds.
+- Resolution:
+  1. Added getInitialDistances() and getInitialPrevious() to pre-populate distances on frame 0.
+  2. In GraphCanvas.tsx: added const isCandidate = candidateNodeIds?.has(node.id) ?? false;
+  3. Added null-safe formatting: dist === undefined || dist === null || dist === Infinity ? '∞' : dist.toString();
+  4. Added defensive null-guards to DistanceTable.tsx.
+
+Issue 2: TypeScript ES5 Set Iteration Build Failure
+- Location: frontend/src/components/arena/AlgorithmArena.tsx & graphAlgorithms.ts
+- Error: TS2802: Type 'Set<string>' can only be iterated through when using '--downlevelIteration' flag.
+- Resolution:
+  1. Updated frontend/tsconfig.json compilerOptions: "target": "es2020", "downlevelIteration": true.
+  2. Refactored Set spreads ([...set, item]) to new Set(set).add(item) mutations and unvisited.forEach().
+  3. Verified npx tsc --noEmit compiles with 0 errors.
+
+Issue 3: Incomplete Path Submission Confusion
+- Problem: User completed all 5 node relaxations, but clicking "Submit Shortest Path" 
+  failed with: "Expected: A -> C -> B -> D -> E. You submitted: A. Click Reset to try again."
+- Root Cause: Reconstructing the shortest path was Phase 2. The path started with just [A]. 
+  Clicking submit prematurely submitted only [A]. The error message told the user to reset.
+- Resolution:
+  1. Added "⚡ Auto-Trace from Table" button that automatically parses the Predecessor table.
+  2. Added interactive sequence badges ([ A ] -> [ C ] -> [ B ] -> [ D ] -> [ E ]) with Undo/Clear.
+  3. Added Incomplete Path Guard in handleSubmitPath() that warns and guides rather than failing.
+
+================================================================================
+8. LOCAL RUNTIME CONFIGURATION & POWERSHELL COMMANDS
+================================================================================
+Prerequisites:
+- Python 3.13: C:\Users\niran\AppData\Local\Programs\Python\Python313\python.exe
+- Node.js v20.18.0 & npm 10.8.2: C:\Users\niran\AppData\Local\Programs\nodejs
+
+Starting Backend (FastAPI Daemon on Port 8000):
+  powershell
+  $env:PYTHONPATH = "c:\Users\niran\OneDrive\ドキュメント\ThinkForge"
+  & "C:\Users\niran\AppData\Local\Programs\Python\Python313\python.exe" -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+
+Starting Frontend (Next.js on Port 3000):
+  powershell
+  $env:PATH = "C:\Users\niran\AppData\Local\Programs\nodejs;$env:PATH"
+  cd frontend
+  npm run dev
+
+Running Frontend Typecheck:
+  powershell
+  $env:PATH = "C:\Users\niran\AppData\Local\Programs\nodejs;$env:PATH"
+  cd frontend
+  npx tsc --noEmit
+
+Running Backend Test Suite:
+  powershell
+  $env:PYTHONPATH = "c:\Users\niran\OneDrive\ドキュメント\ThinkForge"
+  & "C:\Users\niran\AppData\Local\Programs\Python\Python313\python.exe" -m pytest backend/tests/test_api.py -v
+
+================================================================================
+9. AUTOMATED TEST SUITE & VERIFICATION LOG
+================================================================================
+Backend API Tests (pytest backend/tests/test_api.py):
+- test_health_check                                 PASSED [100%]
+- test_chunking_metadata_preservation               PASSED [100%]
+- test_mentor_progressive_hint_levels               PASSED [100%]
+- test_anti_cheat_evaluation_and_defense_trigger    PASSED [100%]
+- test_socratic_defense_verification                PASSED [100%]
+- test_deterministic_transfer_scoring               PASSED [100%]
+- test_get_assignments_and_independence_profile     PASSED [100%]
+
+Frontend Verification:
+- npx tsc --noEmit: Exited with code 0 (Zero TypeScript errors)
+- http://localhost:3000: HTTP 200 OK
+- http://127.0.0.1:8000/api/health: HTTP 200 OK {"status": "healthy"}
+- http://127.0.0.1:8000/docs: Interactive OpenAPI Swagger documentation live
+
+================================================================================
+10. GIT INITIALIZATION & GITHUB COMMIT AUDIT TRAIL
+================================================================================
+Remote Repository: https://github.com/NidhiyaS25/ThinkForge.git
+Branch: main
+
+Commit History Audit Trail:
+- 0be5984: feat: initial commit for ThinkForge (SocraticLMS) prototype (44 files, 6403 lines)
+- 9c96172: docs: add comprehensive technical stack and architecture documentation in README.md
+- a6b4c33: feat(arena): integrate Algorithm Arena playable mini-game suite into ThinkForge
+- 2cd3fde: fix(arena): add safe toString handling for undefined node distance in GraphCanvas
+- 0c85387: fix(arena): resolve undefined distance rendering and typescript set iteration
+- 6b7a3a2: feat(arena): add interactive shortest path sequence reconstruction and auto-trace
+
+All code, assets, documentation, tests, and bug fixes are committed and synchronized 
+with the GitHub repository.
+================================================================================
+END OF SUMMARY REPORT
 ================================================================================
