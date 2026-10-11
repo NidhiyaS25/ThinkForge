@@ -19,10 +19,17 @@ import {
   Award,
   ArrowRight,
   ShieldCheck,
-  Compass
+  Compass,
+  Scale,
+  Sparkle,
+  Home
 } from 'lucide-react';
 import { GraphCanvas } from './GraphCanvas';
 import { DistanceTable } from './DistanceTable';
+import { PathPup, PathPupState } from './PathPup';
+import { BubbleSortGame } from './BubbleSortGame';
+import { SelectionSortGame } from './SelectionSortGame';
+import { SortingComparison } from './SortingComparison';
 import {
   GRAPH_CHALLENGES,
   GraphChallenge,
@@ -37,7 +44,15 @@ interface AlgorithmArenaProps {
   onBack: () => void;
 }
 
-type GameMode = 'dijkstra_path' | 'build_algorithm' | 'edge_selection';
+export type GameMode =
+  | 'hub'
+  | 'dijkstra_path'
+  | 'bubble_sort'
+  | 'selection_sort'
+  | 'sorting_showdown'
+  | 'build_algorithm'
+  | 'edge_selection';
+
 type Difficulty = 'easy' | 'medium' | 'hard';
 
 const getInitialDistances = (diff: Difficulty): Record<string, number> => {
@@ -58,8 +73,11 @@ const getInitialPrevious = (diff: Difficulty): Record<string, string | null> => 
 
 export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   // Mode & Difficulty
-  const [gameMode, setGameMode] = useState<GameMode>('dijkstra_path');
+  const [gameMode, setGameMode] = useState<GameMode>('hub');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
+
+  // Comparison Lab array override
+  const [comparisonArrayOverride, setComparisonArrayOverride] = useState<number[] | undefined>(undefined);
 
   // Active Challenge Data
   const challenge = GRAPH_CHALLENGES[difficulty];
@@ -74,6 +92,15 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(true);
   const [highScore, setHighScore] = useState<number>(0);
   const [isCompleted, setIsCompleted] = useState<boolean>(false);
+
+  // PathPup Mascot State
+  const [pupState, setPupState] = useState<PathPupState>('idle');
+  const [pupMessage, setPupMessage] = useState<string>(
+    `Challenge started! Select the source node (${challenge.source}) to initialize Dijkstra's shortest-path traversal.`
+  );
+
+  // Spark Effect Target
+  const [sparkNodeId, setSparkNodeId] = useState<string | null>(null);
 
   // Mode A: Dijkstra Live Game State
   const [distances, setDistances] = useState<Record<string, number>>(() => getInitialDistances('easy'));
@@ -134,6 +161,12 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     setTimerSeconds(0);
     setIsTimerRunning(true);
     setScore(100);
+    setSparkNodeId(null);
+
+    setPupState('idle');
+    setPupMessage(
+      `Select the unvisited node with minimum tentative distance: Node ${GRAPH_CHALLENGES[difficulty].source} (dist = 0).`
+    );
 
     setGuidanceMessage({
       type: 'info',
@@ -158,12 +191,14 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     setModeBScore(null);
   }, []);
 
-  // Timer Tick
+  // Timer interval
   useEffect(() => {
-    if (!isTimerRunning || isCompleted) return;
-    const interval = setInterval(() => {
-      setTimerSeconds((prev) => prev + 1);
-    }, 1000);
+    let interval: NodeJS.Timeout;
+    if (isTimerRunning && !isCompleted) {
+      interval = setInterval(() => {
+        setTimerSeconds((prev) => prev + 1);
+      }, 1000);
+    }
     return () => clearInterval(interval);
   }, [isTimerRunning, isCompleted]);
 
@@ -186,6 +221,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     // If we are in path reconstruction mode
     if (submittingPathMode) {
       if (reconstructedPath.includes(clickedNodeId)) {
+        setPupState('thinking');
+        setPupMessage(`Node ${clickedNodeId} is already in your path sequence.`);
         setGuidanceMessage({
           type: 'warning',
           text: `Node ${clickedNodeId} is already in your path sequence.`
@@ -195,6 +232,9 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
 
       const newPath = [...reconstructedPath, clickedNodeId];
       setReconstructedPath(newPath);
+      setSparkNodeId(clickedNodeId);
+      setPupState('happy');
+      setPupMessage(`Great step! Connected Node ${clickedNodeId} into path.`);
 
       // Highlight path edges
       if (newPath.length >= 2) {
@@ -220,7 +260,6 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     // Standard Dijkstra Selection Phase:
     // 1. If no active current node: verify if clickedNodeId is indeed the unvisited node with minimum tentative distance!
     if (!currentNodeId) {
-      // Find valid minimum unvisited node
       let minVal = Infinity;
       let validCandidate = '';
 
@@ -234,6 +273,10 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
       if (clickedNodeId !== validCandidate) {
         setMistakes((mis) => mis + 1);
         setScore((s) => Math.max(0, s - 2));
+        setPupState('sad');
+        setPupMessage(
+          `Oops! By Dijkstra's greedy rule, pick the node with smallest tentative distance: Node ${validCandidate} (dist: ${minVal}). Every mistake teaches us!`
+        );
         setGuidanceMessage({
           type: 'error',
           text: `Invalid selection! By Dijkstra's greedy invariant, you must pick the unvisited node with the smallest tentative distance (Node ${validCandidate} with dist = ${minVal}).`
@@ -244,6 +287,9 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
       // Valid node selected!
       setCurrentNodeId(clickedNodeId);
       setScore((s) => s + 10);
+      setSparkNodeId(clickedNodeId);
+      setPupState('happy');
+      setPupMessage(`Woof! Activated Node ${clickedNodeId} (smallest distance = ${minVal})! Now inspect connecting edges.`);
 
       // Find unvisited neighbors
       const neighbors = challenge.edges
@@ -258,45 +304,36 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
 
       setGuidanceMessage({
         type: 'success',
-        text: `Correct! Node ${clickedNodeId} (dist = ${distances[clickedNodeId]}) is active. Now click an edge connected to its unvisited neighbors to relax it, or finalize the node.`
+        text: `Active Node: ${clickedNodeId} (tentative distance: ${minVal}). Now select adjacent edges to relax tentative distances to neighbors.`
       });
       return;
     }
 
-    // 2. If a node is already active, clicking another node checks if it's an unvisited neighbor to relax
-    if (currentNodeId && clickedNodeId !== currentNodeId) {
-      if (visitedNodeIds.has(clickedNodeId)) {
-        setGuidanceMessage({
-          type: 'warning',
-          text: `Node ${clickedNodeId} is already finalized! Finalized nodes cannot be relaxed.`
-        });
-        return;
-      }
-
-      // Check if edge exists between currentNodeId and clickedNodeId
-      const edge = challenge.edges.find(
-        (e) =>
-          (e.u === currentNodeId && e.v === clickedNodeId) ||
-          (e.v === currentNodeId && e.u === clickedNodeId)
-      );
-
-      if (!edge) {
-        setGuidanceMessage({
-          type: 'warning',
-          text: `No direct edge connects Node ${currentNodeId} to Node ${clickedNodeId}.`
-        });
-        return;
-      }
-
-      // Relax this edge
-      handleEdgeClick(edge.id);
+    // 2. If a node is already active, clicking another node advises examining edges or finalizing
+    if (clickedNodeId === currentNodeId) {
+      setPupState('thinking');
+      setPupMessage(`Node ${currentNodeId} is active. Click connected edges or click 'Finalize Node ${currentNodeId}'!`);
+      setGuidanceMessage({
+        type: 'info',
+        text: `Node ${currentNodeId} is currently active. Click connected edges to relax distances, or click 'Finalize Node ${currentNodeId}'.`
+      });
+    } else {
+      setPupState('thinking');
+      setPupMessage(`Finish exploring edges for active Node ${currentNodeId} before moving to another node.`);
+      setGuidanceMessage({
+        type: 'warning',
+        text: `Node ${currentNodeId} is active. Please relax connecting edges first, then click 'Finalize Node ${currentNodeId}' before selecting Node ${clickedNodeId}.`
+      });
     }
   };
 
+  // Handle Edge Click (Relaxation)
   const handleEdgeClick = (edgeId: string) => {
     if (isCompleted || submittingPathMode) return;
 
     if (!currentNodeId) {
+      setPupState('sad');
+      setPupMessage("Select an unvisited node with minimum tentative distance first before relaxing edges.");
       setGuidanceMessage({
         type: 'warning',
         text: 'Select an unvisited node with minimum tentative distance first before relaxing edges.'
@@ -308,6 +345,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     if (!edge) return;
 
     if (edge.u !== currentNodeId && edge.v !== currentNodeId) {
+      setPupState('sad');
+      setPupMessage(`Edge ${edge.id} does not connect to active Node ${currentNodeId}. Look for edges touching ${currentNodeId}!`);
       setGuidanceMessage({
         type: 'warning',
         text: `Edge ${edge.id} does not connect to active Node ${currentNodeId}.`
@@ -317,6 +356,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
 
     const neighborId = edge.u === currentNodeId ? edge.v : edge.u;
     if (visitedNodeIds.has(neighborId)) {
+      setPupState('thinking');
+      setPupMessage(`Neighbor Node ${neighborId} is already finalized! Its distance cannot be improved.`);
       setGuidanceMessage({
         type: 'warning',
         text: `Neighbor Node ${neighborId} is already finalized!`
@@ -340,6 +381,9 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
         return next;
       });
       setScore((s) => s + 10);
+      setSparkNodeId(neighborId);
+      setPupState('happy');
+      setPupMessage(`Great move! Distance to Node ${neighborId} dropped from ${currentDist === Infinity ? '∞' : currentDist} to ${tentativeDist}!`);
 
       setGuidanceMessage({
         type: 'success',
@@ -348,6 +392,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
         } down to ${tentativeDist} via Node ${currentNodeId}!`
       });
     } else {
+      setPupState('thinking');
+      setPupMessage(`Examined edge: dist(${currentNodeId}) + ${edge.weight} = ${tentativeDist} is not smaller than existing ${currentDist}. Distance stays minimal.`);
       setGuidanceMessage({
         type: 'info',
         text: `Edge examined: dist(${currentNodeId}) + ${edge.weight} = ${tentativeDist} is not smaller than existing tentative distance ${currentDist}. Distance unchanged.`
@@ -372,12 +418,13 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     if (finalizedId === challenge.destination || newVisited.size === challenge.nodes.length) {
       setSubmittingPathMode(true);
       setReconstructedPath([challenge.source]);
+      setPupState('happy');
+      setPupMessage(`Target Node ${challenge.destination} finalized! Now reconstruct the shortest path using Auto-Trace or clicking nodes.`);
       setGuidanceMessage({
         type: 'success',
-        text: `Target Node ${challenge.destination} finalized! Now reconstruct the shortest path: click nodes in sequence starting from ${challenge.source} to ${challenge.destination}, then click Submit Shortest Path.`
+        text: `Target Node ${challenge.destination} finalized! Now reconstruct the shortest path: click nodes in sequence starting from ${challenge.source} to ${challenge.destination}, or use 'Auto-Trace from Table'.`
       });
     } else {
-      // Find next candidate
       let nextMin = Infinity;
       let nextId = '';
       challenge.nodes.forEach((n) => {
@@ -387,6 +434,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
         }
       });
 
+      setPupState('idle');
+      setPupMessage(`Node ${finalizedId} marked finalized. Next, pick Node ${nextId || 'none'} (dist = ${nextMin}).`);
       setGuidanceMessage({
         type: 'info',
         text: `Node ${finalizedId} marked finalized. Next, select the unvisited node with minimum tentative distance (${nextId || 'none'} with dist = ${nextMin}).`
@@ -398,6 +447,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   const handleClearPath = () => {
     setReconstructedPath([challenge.source]);
     setPathEdgeIds(new Set());
+    setPupState('thinking');
+    setPupMessage(`Path reset to [${challenge.source}]. Build your path to ${challenge.destination}.`);
     setGuidanceMessage({
       type: 'info',
       text: `Path sequence reset to [${challenge.source}]. Click nodes on the graph to build the shortest path to ${challenge.destination}.`
@@ -443,11 +494,16 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
         if (edge) edgesSet.add(edge.id);
       }
       setPathEdgeIds(edgesSet);
+      setSparkNodeId(challenge.destination);
+      setPupState('happy');
+      setPupMessage(`Path auto-traced from table: ${path.join(' → ')}. Click Submit Shortest Path (+30) to finish!`);
       setGuidanceMessage({
         type: 'success',
         text: `Path auto-traced from your Predecessor table: ${path.join(' → ')}. Click Submit Shortest Path (+30) to finish!`
       });
     } else {
+      setPupState('sad');
+      setPupMessage(`Predecessors do not connect back to ${challenge.source}. Make sure all connecting edges were relaxed.`);
       setGuidanceMessage({
         type: 'warning',
         text: `Predecessor pointers from ${challenge.destination} do not connect back to ${challenge.source}. Make sure all edges were relaxed.`
@@ -459,11 +515,12 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   const handleSubmitPath = () => {
     const optimal = fullDijkstra.current.optimalPath;
 
-    // Check if the user hasn't finished connecting to the destination node yet
     if (
       reconstructedPath.length < optimal.length ||
       reconstructedPath[reconstructedPath.length - 1] !== challenge.destination
     ) {
+      setPupState('thinking');
+      setPupMessage(`Path incomplete! You have [${reconstructedPath.join(' → ')}]. Click nodes on the graph to reach Target (${challenge.destination}), or use Auto-Trace!`);
       setGuidanceMessage({
         type: 'warning',
         text: `Path incomplete! You currently have: [${reconstructedPath.join(' → ')}]. Click the next nodes on the graph (${optimal.slice(reconstructedPath.length).join(' → ')}) to reach Target (${challenge.destination}), or click "Auto-Trace from Table"!`
@@ -476,13 +533,14 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
       reconstructedPath.every((val, index) => val === optimal[index]);
 
     if (isCorrect) {
-      // Calculate efficiency bonus
       const efficiencyBonus = Math.max(0, 20 - mistakes * 4);
       const finalScore = score + 30 + efficiencyBonus;
 
       setScore(finalScore);
       setIsCompleted(true);
       setIsTimerRunning(false);
+      setPupState('celebrating');
+      setPupMessage(`PAW-SOME! YOU DID IT! You found the optimal shortest path: ${optimal.join(' → ')} with total weight ${fullDijkstra.current.optimalDistance}!`);
 
       if (finalScore > highScore) {
         setHighScore(finalScore);
@@ -498,6 +556,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     } else {
       setMistakes((m) => m + 1);
       setScore((s) => Math.max(0, s - 5));
+      setPupState('sad');
+      setPupMessage(`Every mistake teaches us something! Path sequence was ${reconstructedPath.join(' → ')}. Try Clear Path or Auto-Trace!`);
       setGuidanceMessage({
         type: 'error',
         text: `Incorrect path sequence: ${reconstructedPath.join(' → ')}. Expected optimal path: ${optimal.join(' → ')}. Click "Clear Path" or "Auto-Trace from Table" to correct it!`
@@ -511,23 +571,26 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     setScore((s) => Math.max(0, s - 5));
 
     if (!currentNodeId) {
-      // Hint for next node
       let minVal = Infinity;
-      let candidate = '';
+      let nextNode = '';
       challenge.nodes.forEach((n) => {
         if (!visitedNodeIds.has(n.id) && distances[n.id] < minVal) {
           minVal = distances[n.id];
-          candidate = n.id;
+          nextNode = n.id;
         }
       });
+      setPupState('thinking');
+      setPupMessage(`Hint: The next node with minimum distance is Node ${nextNode} (dist: ${minVal}).`);
       setGuidanceMessage({
         type: 'info',
-        text: `Hint (-5 pts): The greedy choice requires selecting Node ${candidate} because its tentative distance (${minVal}) is the smallest among all unvisited nodes.`
+        text: `Hint: Select unvisited Node ${nextNode} (tentative distance: ${minVal}).`
       });
     } else {
+      setPupState('thinking');
+      setPupMessage(`Hint: Active Node is ${currentNodeId}. Relax outgoing edges or finalize!`);
       setGuidanceMessage({
         type: 'info',
-        text: `Hint (-5 pts): Examine all unvisited neighbors connected to Node ${currentNodeId}. If currentNode.dist + edge.weight < neighbor.dist, the edge must be relaxed.`
+        text: `Hint: Examine outgoing edges connected to active Node ${currentNodeId} to update neighbor distances.`
       });
     }
   };
@@ -536,35 +599,40 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
   // MODE B: BUILD THE ALGORITHM ACTIONS
   // -------------------------------------------------------------
 
-  const moveStep = (index: number, direction: 'up' | 'down') => {
-    const newSteps = [...shuffledSteps];
+  const handleMoveStep = (index: number, direction: 'up' | 'down') => {
+    if (modeBSubmitted) return;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= newSteps.length) return;
+    if (targetIndex < 0 || targetIndex >= shuffledSteps.length) return;
 
-    const temp = newSteps[index];
-    newSteps[index] = newSteps[targetIndex];
-    newSteps[targetIndex] = temp;
-    setShuffledSteps(newSteps);
-    setModeBSubmitted(false);
+    const copy = [...shuffledSteps];
+    const temp = copy[index];
+    copy[index] = copy[targetIndex];
+    copy[targetIndex] = temp;
+    setShuffledSteps(copy);
   };
 
-  const verifyModeBSequence = () => {
+  const handleVerifyModeB = () => {
     let correctCount = 0;
     shuffledSteps.forEach((step, idx) => {
       if (step.correctIndex === idx) correctCount++;
     });
 
-    setModeBScore({ correct: correctCount, total: shuffledSteps.length });
     setModeBSubmitted(true);
+    setModeBScore({ correct: correctCount, total: shuffledSteps.length });
 
     if (correctCount === shuffledSteps.length) {
-      setScore((s) => s + 50);
+      setScore((s) => s + 40);
+      setPupState('celebrating');
+      setPupMessage("Master of Algorithms! You sequenced all Dijkstra steps perfectly in order!");
       setGuidanceMessage({
         type: 'success',
-        text: 'Mastery Achieved! All 7 algorithm execution steps are in the exact chronological sequence!'
+        text: 'Outstanding! You arranged all 7 algorithm steps in the mathematically correct order!'
       });
     } else {
+      setMistakes((m) => m + 1);
       setScore((s) => Math.max(0, s - 5));
+      setPupState('sad');
+      setPupMessage(`${correctCount} of ${shuffledSteps.length} steps in correct order. Review highlighted steps!`);
       setGuidanceMessage({
         type: 'warning',
         text: `${correctCount} of ${shuffledSteps.length} steps in correct order. Review the highlighted steps below.`
@@ -589,12 +657,16 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
 
     if (chosen?.isCorrect) {
       setScore((s) => s + 25);
+      setPupState('happy');
+      setPupMessage(`Correct! ${chosen.explanation}`);
       setGuidanceMessage({
         type: 'success',
         text: `Correct! ${chosen.explanation}`
       });
     } else {
       setScore((s) => Math.max(0, s - 5));
+      setPupState('sad');
+      setPupMessage(`Incorrect. ${chosen?.explanation || 'Try reviewing Dijkstra edge relaxation rules.'}`);
       setGuidanceMessage({
         type: 'error',
         text: `Incorrect. ${chosen?.explanation || 'Try reviewing Dijkstra edge relaxation rules.'}`
@@ -606,6 +678,8 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     setSelectedOptionId(null);
     setPuzzleSubmitted(false);
     setPuzzleIndex((prev) => (prev + 1) % EDGE_SELECTION_PUZZLES.length);
+    setPupState('idle');
+    setPupMessage("Analyze the graph and choose the edge that satisfies the algorithmic invariant.");
     setGuidanceMessage({
       type: 'info',
       text: 'Analyze the graph and choose the edge that satisfies the algorithmic invariant.'
@@ -631,10 +705,10 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
               <div className="flex items-center gap-2">
                 <span className="font-serif font-bold text-lg text-[#0F2E2E] tracking-tight flex items-center gap-1.5">
                   <Compass className="w-5 h-5 text-[#1F5F50]" />
-                  Algorithm Arena
+                  Algorithm Arena 2.0
                 </span>
                 <span className="bg-[#113A35] text-white text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full">
-                  Interactive Lab
+                  Animated Lab
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden sm:block">
@@ -644,39 +718,50 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
           </div>
 
           {/* Mode Selector Tabs */}
-          <div className="flex items-center bg-slate-200/70 p-1 rounded-xl text-xs font-semibold">
+          <div className="flex items-center bg-slate-200/70 p-1 rounded-xl text-xs font-semibold overflow-x-auto max-w-full">
+            <button
+              onClick={() => setGameMode('hub')}
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                gameMode === 'hub' ? 'bg-white text-[#113A35] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>Arena Hub</span>
+            </button>
             <button
               onClick={() => {
                 setGameMode('dijkstra_path');
                 resetGame();
               }}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                gameMode === 'dijkstra_path'
-                  ? 'bg-white text-[#113A35] shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                gameMode === 'dijkstra_path' ? 'bg-white text-[#113A35] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Mode A: Path Challenge
+              🗺️ Dijkstra
             </button>
             <button
-              onClick={() => setGameMode('build_algorithm')}
+              onClick={() => setGameMode('bubble_sort')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                gameMode === 'build_algorithm'
-                  ? 'bg-white text-[#113A35] shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                gameMode === 'bubble_sort' ? 'bg-white text-[#113A35] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Mode B: Build Algorithm
+              🐧 Bubble Sort
             </button>
             <button
-              onClick={() => setGameMode('edge_selection')}
+              onClick={() => setGameMode('selection_sort')}
               className={`px-3 py-1.5 rounded-lg transition-all ${
-                gameMode === 'edge_selection'
-                  ? 'bg-white text-[#113A35] shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                gameMode === 'selection_sort' ? 'bg-white text-[#113A35] shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Mode C: Edge Puzzles
+              👑 Selection Sort
+            </button>
+            <button
+              onClick={() => setGameMode('sorting_showdown')}
+              className={`px-3 py-1.5 rounded-lg transition-all ${
+                gameMode === 'sorting_showdown' ? 'bg-white text-[#113A35] shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              ⚔️ Showdown
             </button>
           </div>
 
@@ -688,496 +773,505 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
             </div>
 
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-mono text-slate-700 shadow-xs">
-              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
               <span>{formatTime(timerSeconds)}</span>
             </div>
-
-            {highScore > 0 && (
-              <div className="hidden lg:flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-1.5 rounded-xl font-semibold text-[11px]">
-                <Award className="w-3.5 h-3.5 text-amber-600" />
-                <span>Best: {highScore}</span>
-              </div>
-            )}
           </div>
         </div>
       </header>
 
-      {/* 2. SUB-BAR: DIFFICULTY & CONTROLS */}
-      <div className="bg-white border-b border-slate-200/80 px-4 sm:px-8 py-2.5">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Difficulty Selector */}
-          <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-500 uppercase tracking-wider text-[10px]">
-              Difficulty:
-            </span>
-            {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => (
-              <button
-                key={diff}
-                onClick={() => setDifficulty(diff)}
-                className={`px-3 py-1 rounded-full font-medium transition-colors ${
-                  difficulty === diff
-                    ? 'bg-[#113A35] text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {diff.charAt(0).toUpperCase() + diff.slice(1)}
-              </button>
-            ))}
-          </div>
-
-          {/* Game Controls Toolbar */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleRequestHint}
-              disabled={isCompleted || gameMode !== 'dijkstra_path'}
-              className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-xl font-medium transition-colors disabled:opacity-40 cursor-pointer"
-            >
-              <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
-              <span>Hint (-5)</span>
-            </button>
-
-            <button
-              onClick={resetGame}
-              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Challenge</span>
-            </button>
-
-            {currentNodeId && !submittingPathMode && (
-              <button
-                onClick={handleFinalizeCurrentNode}
-                className="inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white px-3.5 py-1.5 rounded-xl font-semibold shadow-xs transition-colors cursor-pointer"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Finalize Node {currentNodeId}</span>
-              </button>
-            )}
-
-            {submittingPathMode && !isCompleted && (
-              <button
-                onClick={handleSubmitPath}
-                className="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-1.5 rounded-xl font-bold shadow-xs transition-colors cursor-pointer"
-              >
-                <Award className="w-3.5 h-3.5" />
-                <span>Submit Shortest Path (+30)</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 3. MAIN INTERACTIVE CONTENT */}
+      {/* 2. MAIN INTERACTIVE CONTENT */}
       <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6 flex-1">
-        {/* Real-time Guidance Banner */}
-        <div
-          className={`p-3.5 rounded-2xl border text-xs flex items-center justify-between gap-3 shadow-xs transition-all ${
-            guidanceMessage.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : guidanceMessage.type === 'error'
-              ? 'bg-rose-50 border-rose-200 text-rose-900'
-              : guidanceMessage.type === 'warning'
-              ? 'bg-amber-50 border-amber-200 text-amber-900'
-              : 'bg-teal-50 border-teal-200 text-teal-900'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            {guidanceMessage.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            ) : guidanceMessage.type === 'error' ? (
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-            ) : (
-              <Sparkles className="w-4 h-4 text-teal-700 shrink-0" />
-            )}
-            <span className="font-medium leading-relaxed">{guidanceMessage.text}</span>
-          </div>
-
-          <div className="text-[11px] font-mono text-slate-500 shrink-0 hidden sm:block">
-            Moves: {moves} • Mistakes: {mistakes} • Hints: {hintsUsed}
-          </div>
-        </div>
-
         {/* ========================================================= */}
-        {/* MODE A: DIJKSTRA'S PATH CHALLENGE */}
+        {/* VIEW 0: ARENA HUB (LANDING HERO & GAME CARDS) */}
         {/* ========================================================= */}
-        {gameMode === 'dijkstra_path' && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left 8 Cols: Interactive Graph SVG Canvas */}
-            <div className="lg:col-span-8 flex flex-col space-y-3">
-              <GraphCanvas
-                nodes={challenge.nodes}
-                edges={challenge.edges}
-                sourceNodeId={challenge.source}
-                destNodeId={challenge.destination}
-                currentNodeId={currentNodeId}
-                visitedNodeIds={visitedNodeIds}
-                candidateNodeIds={candidateNodeIds}
-                pathEdgeIds={pathEdgeIds}
-                relaxedEdgeIds={relaxedEdgeIds}
-                selectedEdgeId={selectedEdgeId}
-                distances={distances}
-                onNodeClick={handleNodeClick}
-                onEdgeClick={handleEdgeClick}
-                interactive={!isCompleted}
-              />
+        {gameMode === 'hub' && (
+          <div className="space-y-8 py-2">
+            {/* Arena Welcome Hero Banner */}
+            <div className="bg-gradient-to-r from-[#0F2E2E] via-[#113A35] to-[#1F5F50] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+              <div className="relative z-10 max-w-3xl space-y-3">
+                <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-300 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-400/30">
+                  Interactive Algorithm World 2.0
+                </span>
+                <h2 className="font-serif text-3xl sm:text-4xl font-bold tracking-tight text-white">
+                  Think Strategically. Solve Algorithmically.
+                </h2>
+                <p className="text-sm sm:text-base text-emerald-100/90 leading-relaxed">
+                  Welcome to Algorithm Arena 2.0! Step into an animated, game-like environment where you master graph pathfinding, edge relaxations, and sorting algorithms through tactile, visual exploration.
+                </p>
+              </div>
 
-              {/* Status Bar & Path Reconstruction Card */}
-              {submittingPathMode && !isCompleted ? (
-                <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white rounded-2xl border border-emerald-500/40 p-4 shadow-md space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-7 h-7 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
-                        2
-                      </span>
-                      <div>
-                        <h5 className="font-bold text-xs sm:text-sm text-emerald-100 flex items-center gap-2">
-                          Step 2: Reconstruct Shortest Path Sequence
-                        </h5>
-                        <p className="text-[11px] text-emerald-200/80">
-                          Click nodes in order on the graph, or click Auto-Trace from your table
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={handleUndoPathNode}
-                        disabled={reconstructedPath.length <= 1}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded-lg text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        Undo
-                      </button>
-                      <button
-                        onClick={handleClearPath}
-                        className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium cursor-pointer transition-colors"
-                      >
-                        Clear
-                      </button>
-                      <button
-                        onClick={handleAutoTracePath}
-                        className="px-3 py-1 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold rounded-lg text-xs shadow-sm cursor-pointer transition-all hover:scale-105 flex items-center gap-1.5"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Auto-Trace from Table</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Sequence Badges */}
-                  <div className="flex flex-wrap items-center gap-2 bg-slate-900/70 p-3 rounded-xl border border-emerald-500/20 text-xs font-mono">
-                    <span className="text-emerald-300 font-sans font-semibold text-[11px]">Sequence:</span>
-                    {reconstructedPath.map((nodeId, idx) => (
-                      <React.Fragment key={idx}>
-                        <span className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shadow-xs">
-                          {nodeId}
-                        </span>
-                        {idx < reconstructedPath.length - 1 && (
-                          <span className="text-emerald-400 font-sans font-bold">→</span>
-                        )}
-                      </React.Fragment>
-                    ))}
-
-                    {reconstructedPath[reconstructedPath.length - 1] !== challenge.destination && (
-                      <>
-                        <span className="text-emerald-400/60 font-sans font-bold">→</span>
-                        <span className="px-2.5 py-1 rounded-lg border border-dashed border-emerald-400/50 text-emerald-300 animate-pulse text-[11px] font-sans">
-                          Click Next Node on Graph
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl border border-slate-200/80 p-3 flex flex-wrap items-center justify-between text-xs gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-700">Source:</span>
-                    <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded">
-                      {challenge.source} (dist: 0)
-                    </span>
-                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="font-semibold text-slate-700">Target:</span>
-                    <span className="bg-rose-100 text-rose-900 font-bold px-2 py-0.5 rounded">
-                      {challenge.destination} (target)
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Right 4 Cols: Live Distance Table & Algorithm Step Tracker */}
-            <div className="lg:col-span-4 flex flex-col space-y-4">
-              <div className="h-[360px]">
-                <DistanceTable
-                  nodes={challenge.nodes}
-                  distances={distances}
-                  previous={previous}
-                  visitedNodeIds={visitedNodeIds}
-                  currentNodeId={currentNodeId}
-                  candidateNodeIds={candidateNodeIds}
+              {/* Mascot Companion in Hero */}
+              <div className="mt-6 pt-6 border-t border-emerald-500/20 max-w-xl">
+                <PathPup
+                  state="happy"
+                  message="Woof! Choose a challenge below. Let's conquer graphs and sorting together!"
+                  size="md"
                 />
               </div>
+            </div>
 
-              {/* Algorithm Quick Rule Card */}
-              <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm text-xs space-y-2">
-                <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-[#1F5F50]" />
-                  Dijkstra Invariant Rules:
-                </h5>
-                <ul className="text-slate-600 space-y-1 list-disc pl-4 text-[11px] leading-relaxed">
-                  <li>
-                    Always select the <strong>unvisited node with smallest distance</strong>.
-                  </li>
-                  <li>
-                    Relax edges: if <code>dist(u) + weight &lt; dist(v)</code>, update <code>v</code>.
-                  </li>
-                  <li>
-                    Once a node is marked <strong>finalized</strong>, its distance is mathematically guaranteed to be minimal.
-                  </li>
-                </ul>
+            {/* 3 Primary Game Cards + Comparison Lab */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* CARD 1: DIJKSTRA PATH ADVENTURE */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all p-6 flex flex-col justify-between group hover:-translate-y-1">
+                <div className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform">
+                    🗺️
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                      Graphs • Greedy
+                    </span>
+                    <h3 className="font-serif font-bold text-xl text-[#0F2E2E] mt-2">
+                      Dijkstra's Path Adventure
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Find the shortest route across weighted graphs! Relax tentative distances, watch animated directional arrows, and reconstruct the optimal path with PathPup.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">3 Difficulties</span>
+                    <span>•</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">Live Predecessor Table</span>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-100 mt-6 flex items-center justify-between">
+                  <span className="text-xs font-bold text-teal-800">Easy to Hard</span>
+                  <button
+                    onClick={() => {
+                      setGameMode('dijkstra_path');
+                      resetGame();
+                    }}
+                    className="inline-flex items-center gap-1.5 bg-[#64D8B8] hover:bg-[#52cba9] text-[#0A2328] px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 cursor-pointer"
+                  >
+                    <span>Play Adventure</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 2: BUBBLE SORT PENGUIN PARADE */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all p-6 flex flex-col justify-between group hover:-translate-y-1">
+                <div className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform">
+                    🐧
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-sky-700 bg-sky-50 px-2 py-0.5 rounded-full border border-sky-200">
+                      Sorting • Adjacent Swaps
+                    </span>
+                    <h3 className="font-serif font-bold text-xl text-[#0F2E2E] mt-2">
+                      Bubble Sort: Penguin Parade
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Help penguins arrange themselves from shortest to tallest by repeatedly comparing and swapping neighbors. Discover early-exit optimization!
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">3 Play Modes</span>
+                    <span>•</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">Early Exit O(n)</span>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-100 mt-6 flex items-center justify-between">
+                  <span className="text-xs font-bold text-sky-800">Stable Sort</span>
+                  <button
+                    onClick={() => setGameMode('bubble_sort')}
+                    className="inline-flex items-center gap-1.5 bg-sky-500 hover:bg-sky-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 cursor-pointer"
+                  >
+                    <span>Join Parade</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 3: SELECTION SORT PENGUIN CHAMPION */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all p-6 flex flex-col justify-between group hover:-translate-y-1">
+                <div className="space-y-4">
+                  <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-3xl shadow-inner group-hover:scale-110 transition-transform">
+                    👑
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                      Sorting • Minimum Scanner
+                    </span>
+                    <h3 className="font-serif font-bold text-xl text-[#0F2E2E] mt-2">
+                      Selection Sort: Penguin Champion
+                    </h3>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      Scan the unsorted lineup to find the shortest remaining penguin, then crown them directly into the front champion position each round!
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">Min-Scan Focus</span>
+                    <span>•</span>
+                    <span className="bg-slate-100 px-2 py-0.5 rounded">Max n - 1 Swaps</span>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-100 mt-6 flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-800">Swap Efficient</span>
+                  <button
+                    onClick={() => setGameMode('selection_sort')}
+                    className="inline-flex items-center gap-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 px-4 py-2 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 cursor-pointer"
+                  >
+                    <span>Crown Champion</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* ========================================================= */}
-        {/* MODE B: BUILD THE ALGORITHM (SEQUENCING CHALLENGE) */}
-        {/* ========================================================= */}
-        {gameMode === 'build_algorithm' && (
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-sm space-y-6">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#2E7A68]">
-                Mode B: Sequencing Challenge
-              </span>
-              <h3 className="text-2xl font-serif font-bold text-[#0F2E2E] mt-1">
-                Assemble Dijkstra's Algorithm in Order
-              </h3>
-              <p className="text-xs text-slate-600 mt-1">
-                Arrange the shuffled operational steps into the exact algorithmic order using the Up and Down buttons.
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              {shuffledSteps.map((step, index) => {
-                const isCorrectPlacement = modeBSubmitted && step.correctIndex === index;
-                const isWrongPlacement = modeBSubmitted && step.correctIndex !== index;
-
-                return (
-                  <div
-                    key={step.id}
-                    className={`p-4 rounded-2xl border transition-all flex items-center justify-between gap-4 ${
-                      isCorrectPlacement
-                        ? 'border-emerald-300 bg-emerald-50/60'
-                        : isWrongPlacement
-                        ? 'border-rose-300 bg-rose-50/50'
-                        : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="w-7 h-7 rounded-xl bg-slate-800 text-white font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                        {index + 1}
-                      </span>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-900 leading-snug">{step.text}</p>
-                        {modeBSubmitted && (
-                          <p
-                            className={`text-[11px] mt-1 ${
-                              isCorrectPlacement ? 'text-emerald-800' : 'text-rose-800'
-                            }`}
-                          >
-                            {isCorrectPlacement
-                              ? '✓ Correct step position'
-                              : `Incorrect: Belongs at Step ${step.correctIndex + 1}. (${step.explanation})`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Up / Down Reorder Controls */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => moveStep(index, 'up')}
-                        disabled={index === 0}
-                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-30 transition-colors"
-                      >
-                        <ChevronUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => moveStep(index, 'down')}
-                        disabled={index === shuffledSteps.length - 1}
-                        className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-30 transition-colors"
-                      >
-                        <ChevronDown className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              {modeBScore && (
-                <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-emerald-600" />
-                  <span>
-                    Score: {modeBScore.correct} / {modeBScore.total} Steps Correct
+            {/* CARD 4: SORTING SHOWDOWN BENCHMARK LAB */}
+            <div className="bg-gradient-to-r from-slate-900 to-[#113A35] rounded-3xl p-6 sm:p-8 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-amber-400" />
+                  <span className="text-xs font-bold tracking-wider uppercase text-amber-300">
+                    Laboratory Experiment
                   </span>
                 </div>
-              )}
+                <h3 className="font-serif text-2xl font-bold text-white">
+                  Sorting Showdown: Live Head-to-Head Comparison
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Run Bubble Sort and Selection Sort simultaneously on the exact same array. Compare swaps, comparisons, stability, and runtime behavior with live telemetry.
+                </p>
+              </div>
+
               <button
-                onClick={verifyModeBSequence}
-                className="bg-[#113A35] hover:bg-[#0c2a26] text-white px-6 py-2.5 rounded-xl font-medium text-xs shadow-xs transition-colors cursor-pointer"
+                onClick={() => setGameMode('sorting_showdown')}
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-slate-950 font-bold px-6 py-3 rounded-2xl text-xs shadow-md transition-all hover:scale-105 shrink-0 cursor-pointer"
               >
-                Verify Algorithm Sequence
+                <span>Launch Comparison Lab</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
         {/* ========================================================= */}
-        {/* MODE C: EDGE SELECTION PUZZLE */}
+        {/* VIEW 1: DIJKSTRA'S PATH ADVENTURE */}
         {/* ========================================================= */}
-        {gameMode === 'edge_selection' && (
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-8 shadow-sm space-y-6">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#2E7A68]">
-                Mode C: Decision-Making Puzzle {puzzleIndex + 1} of {EDGE_SELECTION_PUZZLES.length}
-              </span>
-              <h3 className="text-2xl font-serif font-bold text-[#0F2E2E] mt-1">
-                {EDGE_SELECTION_PUZZLES[puzzleIndex].title}
-              </h3>
-              <p className="text-sm text-slate-700 mt-2 leading-relaxed">
-                {EDGE_SELECTION_PUZZLES[puzzleIndex].question}
-              </p>
-            </div>
-
-            {/* Options Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              {EDGE_SELECTION_PUZZLES[puzzleIndex].options.map((option) => {
-                const isSelected = selectedOptionId === option.id;
-                const isCorrect = puzzleSubmitted && option.isCorrect;
-                const isWrong = puzzleSubmitted && isSelected && !option.isCorrect;
-
-                return (
-                  <div
-                    key={option.id}
-                    onClick={() => handleSelectPuzzleOption(option.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
-                      isCorrect
-                        ? 'border-emerald-400 bg-emerald-50 text-emerald-950 font-semibold'
-                        : isWrong
-                        ? 'border-rose-400 bg-rose-50 text-rose-950'
-                        : isSelected
-                        ? 'border-teal-600 bg-teal-50/50 ring-2 ring-teal-600/30'
-                        : 'border-slate-200 bg-slate-50/60 hover:bg-slate-100/60'
+        {gameMode === 'dijkstra_path' && (
+          <div className="space-y-6">
+            {/* Top Toolbar: Difficulty & Actions */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+              {/* Difficulty Selector */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-500 font-semibold">DIFFICULTY:</span>
+                {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => (
+                  <button
+                    key={diff}
+                    onClick={() => setDifficulty(diff)}
+                    className={`px-3 py-1 rounded-full font-medium transition-colors ${
+                      difficulty === diff
+                        ? 'bg-[#113A35] text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-bold">{option.label}</span>
-                      {isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
-                      {isWrong && <AlertTriangle className="w-4 h-4 text-rose-600" />}
-                    </div>
-                    {puzzleSubmitted && (
-                      <p className="text-[11px] text-slate-600 mt-2 font-normal leading-relaxed">
-                        {option.explanation}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-              <span className="text-[11px] text-slate-500">
-                Correct answer awards +25 points to your total score.
-              </span>
-
-              <div className="flex items-center gap-2">
-                {!puzzleSubmitted ? (
-                  <button
-                    onClick={handleVerifyPuzzle}
-                    disabled={!selectedOptionId}
-                    className="bg-[#113A35] hover:bg-[#0c2a26] text-white px-6 py-2.5 rounded-xl font-medium text-xs disabled:opacity-40 transition-colors cursor-pointer"
-                  >
-                    Submit Decision
+                    {diff.charAt(0).toUpperCase() + diff.slice(1)}
                   </button>
-                ) : (
+                ))}
+              </div>
+
+              {/* Game Controls Toolbar */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRequestHint}
+                  disabled={isCompleted}
+                  className="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 px-3 py-1.5 rounded-xl font-medium transition-colors disabled:opacity-40 cursor-pointer text-xs"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Hint (-5)</span>
+                </button>
+
+                <button
+                  onClick={resetGame}
+                  className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium transition-colors cursor-pointer text-xs"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Challenge</span>
+                </button>
+
+                {currentNodeId && !submittingPathMode && (
                   <button
-                    onClick={handleNextPuzzle}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                    onClick={handleFinalizeCurrentNode}
+                    className="inline-flex items-center gap-1.5 bg-teal-700 hover:bg-teal-800 text-white px-3.5 py-1.5 rounded-xl font-semibold shadow-xs transition-colors cursor-pointer text-xs"
                   >
-                    Next Puzzle →
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Finalize Node {currentNodeId}</span>
+                  </button>
+                )}
+
+                {submittingPathMode && !isCompleted && (
+                  <button
+                    onClick={handleSubmitPath}
+                    className="inline-flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white px-4 py-1.5 rounded-xl font-bold shadow-xs transition-colors cursor-pointer text-xs"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    <span>Submit Shortest Path (+30)</span>
                   </button>
                 )}
               </div>
             </div>
+
+            {/* PathPup Companion Banner */}
+            <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm">
+              <PathPup state={pupState} message={pupMessage} size="md" />
+            </div>
+
+            {/* Main Interactive Graph Canvas & Table Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left 8 Cols: Interactive Graph SVG Canvas */}
+              <div className="lg:col-span-8 flex flex-col space-y-3">
+                <GraphCanvas
+                  nodes={challenge.nodes}
+                  edges={challenge.edges}
+                  sourceNodeId={challenge.source}
+                  destNodeId={challenge.destination}
+                  currentNodeId={currentNodeId}
+                  visitedNodeIds={visitedNodeIds}
+                  candidateNodeIds={candidateNodeIds}
+                  pathEdgeIds={pathEdgeIds}
+                  relaxedEdgeIds={relaxedEdgeIds}
+                  selectedEdgeId={selectedEdgeId}
+                  distances={distances}
+                  onNodeClick={handleNodeClick}
+                  onEdgeClick={handleEdgeClick}
+                  interactive={!isCompleted}
+                  reconstructedPath={reconstructedPath}
+                  sparkNodeId={sparkNodeId}
+                  onSparkComplete={() => setSparkNodeId(null)}
+                />
+
+                {/* Status Bar & Path Reconstruction Card */}
+                {submittingPathMode && !isCompleted ? (
+                  <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white rounded-2xl border border-emerald-500/40 p-4 shadow-md space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-7 h-7 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                          2
+                        </span>
+                        <div>
+                          <h5 className="font-bold text-xs sm:text-sm text-emerald-100 flex items-center gap-2">
+                            Step 2: Reconstruct Shortest Path Sequence
+                          </h5>
+                          <p className="text-[11px] text-emerald-200/80">
+                            Click nodes in order on the graph, or click Auto-Trace from your table
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleUndoPathNode}
+                          disabled={reconstructedPath.length <= 1}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                        >
+                          Undo
+                        </button>
+                        <button
+                          onClick={handleClearPath}
+                          className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          onClick={handleAutoTracePath}
+                          className="px-3 py-1 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold rounded-lg text-xs shadow-sm cursor-pointer transition-all hover:scale-105 flex items-center gap-1.5"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>⚡ Auto-Trace from Table</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sequence Badges */}
+                    <div className="flex flex-wrap items-center gap-2 bg-slate-900/70 p-3 rounded-xl border border-emerald-500/20 text-xs font-mono">
+                      <span className="text-emerald-300 font-sans font-semibold text-[11px]">Sequence:</span>
+                      {reconstructedPath.map((nodeId, idx) => (
+                        <React.Fragment key={idx}>
+                          <span className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shadow-xs">
+                            {nodeId}
+                          </span>
+                          {idx < reconstructedPath.length - 1 && (
+                            <span className="text-emerald-400 font-sans font-bold">→</span>
+                          )}
+                        </React.Fragment>
+                      ))}
+
+                      {reconstructedPath[reconstructedPath.length - 1] !== challenge.destination && (
+                        <>
+                          <span className="text-emerald-400/60 font-sans font-bold">→</span>
+                          <span className="px-2.5 py-1 rounded-lg border border-dashed border-emerald-400/50 text-emerald-300 animate-pulse text-[11px] font-sans">
+                            Click Next Node on Graph
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl border border-slate-200/80 p-3 flex flex-wrap items-center justify-between text-xs gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-700">Source:</span>
+                      <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded">
+                        {challenge.source} (dist: 0)
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="font-semibold text-slate-700">Target:</span>
+                      <span className="bg-rose-100 text-rose-900 font-bold px-2 py-0.5 rounded">
+                        {challenge.destination} (target)
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] font-mono text-slate-500">
+                      Moves: {moves} • Mistakes: {mistakes} • Hints: {hintsUsed}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Right 4 Cols: Live Distance Table & Algorithm Step Tracker */}
+              <div className="lg:col-span-4 flex flex-col space-y-4">
+                <div className="h-[360px]">
+                  <DistanceTable
+                    nodes={challenge.nodes}
+                    distances={distances}
+                    previous={previous}
+                    visitedNodeIds={visitedNodeIds}
+                    currentNodeId={currentNodeId}
+                    candidateNodeIds={candidateNodeIds}
+                  />
+                </div>
+
+                {/* Algorithm Invariant Rules Card */}
+                <div className="bg-white rounded-2xl border border-slate-200/90 p-4 shadow-sm text-xs space-y-2">
+                  <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-[#1F5F50]" />
+                    Dijkstra Invariant Rules:
+                  </h5>
+                  <ul className="text-slate-600 space-y-1 list-disc pl-4 text-[11px] leading-relaxed">
+                    <li>
+                      Always select the <strong>unvisited node with smallest distance</strong>.
+                    </li>
+                    <li>
+                      Relax edges: if <code>dist(u) + weight &lt; dist(v)</code>, update <code>v</code>.
+                    </li>
+                    <li>
+                      Once a node is marked <strong>finalized</strong>, its distance is mathematically guaranteed to be minimal.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 2: BUBBLE SORT PENGUIN PARADE */}
+        {/* ========================================================= */}
+        {gameMode === 'bubble_sort' && (
+          <BubbleSortGame
+            onBackToHub={() => setGameMode('hub')}
+            onCompareWithSelection={(arr) => {
+              setComparisonArrayOverride(arr);
+              setGameMode('sorting_showdown');
+            }}
+          />
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 3: SELECTION SORT PENGUIN CHAMPION */}
+        {/* ========================================================= */}
+        {gameMode === 'selection_sort' && (
+          <SelectionSortGame
+            onBackToHub={() => setGameMode('hub')}
+            onCompareWithBubble={(arr) => {
+              setComparisonArrayOverride(arr);
+              setGameMode('sorting_showdown');
+            }}
+          />
+        )}
+
+        {/* ========================================================= */}
+        {/* VIEW 4: SORTING SHOWDOWN BENCHMARK LAB */}
+        {/* ========================================================= */}
+        {gameMode === 'sorting_showdown' && (
+          <SortingComparison
+            initialArrayOverride={comparisonArrayOverride}
+            onBackToHub={() => setGameMode('hub')}
+          />
         )}
       </main>
 
-      {/* 4. SUCCESS COMPLETION MODAL */}
+      {/* 3. VICTORY CELEBRATION MODAL */}
       {isCompleted && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border border-slate-200 max-w-md w-full p-6 sm:p-8 text-center space-y-6 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="w-16 h-16 rounded-3xl bg-emerald-50 border-2 border-emerald-300 text-emerald-700 flex items-center justify-center mx-auto shadow-inner">
-              <Trophy className="w-8 h-8" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-emerald-100 text-center space-y-6 relative overflow-hidden">
+            <div className="flex justify-center">
+              <PathPup state="celebrating" size="lg" />
             </div>
 
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-[#2E7A68]">
-                Algorithm Arena Mastered
+              <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                CHALLENGE COMPLETED
               </span>
-              <h3 className="text-2xl font-serif font-bold text-[#0F2E2E] mt-1">
-                Optimal Shortest Path Found!
+              <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#0F2E2E] mt-2">
+                PAW-SOME! YOU DID IT!
               </h3>
-              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                You successfully applied Dijkstra's greedy selection and relaxation invariants to reach Target Node {challenge.destination}.
+              <p className="text-xs text-slate-600 mt-1 max-w-sm mx-auto leading-relaxed">
+                You found the shortest path! Every smart decision brought you closer to the goal.
               </p>
             </div>
 
-            {/* Score Breakdown Card */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-xs space-y-2 text-left">
-              <div className="flex justify-between pb-1 border-b border-slate-200/60">
-                <span className="text-slate-600">Final Score:</span>
-                <span className="font-bold font-mono text-emerald-700 text-sm">{score} pts</span>
+            {/* Victory Score Matrix */}
+            <div className="grid grid-cols-3 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[10px]">TOTAL SCORE</span>
+                <span className="font-mono font-bold text-lg text-emerald-800">{score}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Completion Time:</span>
-                <span className="font-mono text-slate-800">{formatTime(timerSeconds)}</span>
+              <div>
+                <span className="text-slate-400 block text-[10px]">PATH WEIGHT</span>
+                <span className="font-mono font-bold text-lg text-teal-800">
+                  {fullDijkstra.current.optimalDistance}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Total Moves:</span>
-                <span className="font-mono text-slate-800">{moves}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-600">Mistakes Avoided:</span>
-                <span className="font-mono text-slate-800">{mistakes}</span>
-              </div>
-              <div className="flex justify-between pt-1 border-t border-slate-200/60 font-semibold text-slate-900">
-                <span>Optimal Distance:</span>
-                <span className="font-mono text-emerald-800">
-                  {fullDijkstra.current.optimalDistance} units
+              <div>
+                <span className="text-slate-400 block text-[10px]">ACCURACY</span>
+                <span className="font-mono font-bold text-lg text-emerald-800">
+                  {Math.max(0, 100 - mistakes * 10)}%
                 </span>
               </div>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-3">
+            {/* Path Result */}
+            <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-xs font-mono font-bold text-emerald-900">
+              Optimal Route: {reconstructedPath.join(' → ')}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
               <button
                 onClick={resetGame}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3 rounded-xl font-medium text-xs transition-colors cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors cursor-pointer"
               >
                 Play Again
               </button>
-
               <button
                 onClick={() => {
-                  const nextDiff: Difficulty =
-                    difficulty === 'easy' ? 'medium' : difficulty === 'medium' ? 'hard' : 'easy';
-                  setDifficulty(nextDiff);
+                  setDifficulty(difficulty === 'easy' ? 'medium' : 'hard');
+                  resetGame();
                 }}
-                className="flex-1 bg-[#113A35] hover:bg-[#0c2a26] text-white py-3 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-emerald-700 hover:bg-emerald-800 text-white shadow-md transition-all hover:scale-105 cursor-pointer"
               >
-                Next Difficulty →
+                Try Next Level ➔
               </button>
             </div>
           </div>

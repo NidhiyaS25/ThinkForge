@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { GraphNode, GraphEdge } from '../../lib/graphAlgorithms';
+import { SparkEffect } from './SparkEffect';
 
 interface GraphCanvasProps {
   nodes: GraphNode[];
@@ -18,6 +19,9 @@ interface GraphCanvasProps {
   onNodeClick: (nodeId: string) => void;
   onEdgeClick?: (edgeId: string) => void;
   interactive?: boolean;
+  reconstructedPath?: string[];
+  sparkNodeId?: string | null;
+  onSparkComplete?: () => void;
 }
 
 export const GraphCanvas: React.FC<GraphCanvasProps> = ({
@@ -34,9 +38,15 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   distances,
   onNodeClick,
   onEdgeClick,
-  interactive = true
+  interactive = true,
+  reconstructedPath = [],
+  sparkNodeId = null,
+  onSparkComplete
 }) => {
   const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  // Find spark target coordinate
+  const sparkTargetNode = sparkNodeId ? nodeMap.get(sparkNodeId) : null;
 
   return (
     <div className="relative w-full bg-slate-900/90 rounded-2xl border border-slate-700/80 p-2 sm:p-4 shadow-inner overflow-hidden select-none">
@@ -56,7 +66,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         className="w-full h-auto max-h-[460px] drop-shadow-md"
         style={{ minHeight: '260px' }}
       >
-        {/* Defs for arrowheads & filters */}
+        {/* Defs for arrowheads & glow filters */}
         <defs>
           <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -66,9 +76,33 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             <feGaussianBlur stdDeviation="3.5" result="blur" />
             <feComposite in="SourceGraphic" in2="blur" operator="over" />
           </filter>
+
+          {/* Directional Arrowheads */}
+          <marker
+            id="path-arrow"
+            viewBox="0 0 10 10"
+            refX="6"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#10B981" />
+          </marker>
+          <marker
+            id="path-arrow-active"
+            viewBox="0 0 10 10"
+            refX="6"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto"
+          >
+            <path d="M 0 1 L 10 5 L 0 9 z" fill="#34D399" filter="url(#glow-green)" />
+          </marker>
         </defs>
 
-        {/* 1. EDGES LAYER */}
+        {/* 1. BASE EDGES LAYER */}
         <g id="edges">
           {edges.map((edge) => {
             const uNode = nodeMap.get(edge.u);
@@ -90,7 +124,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
             if (isInPath) {
               strokeColor = '#10B981'; // emerald-500
-              strokeWidth = 5;
+              strokeWidth = 4.5;
               filter = 'url(#glow-green)';
             } else if (isSelected) {
               strokeColor = '#F59E0B'; // amber-500
@@ -152,7 +186,58 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           })}
         </g>
 
-        {/* 2. NODES LAYER */}
+        {/* 2. DIRECTIONAL ANIMATED PATH ARROWS & PARTICLES LAYER */}
+        <g id="directional-path">
+          {reconstructedPath.length >= 2 &&
+            reconstructedPath.slice(0, -1).map((uId, idx) => {
+              const vId = reconstructedPath[idx + 1];
+              const uNode = nodeMap.get(uId);
+              const vNode = nodeMap.get(vId);
+              if (!uNode || !vNode) return null;
+
+              const dx = vNode.x - uNode.x;
+              const dy = vNode.y - uNode.y;
+              const dist = Math.hypot(dx, dy);
+              if (dist <= 0) return null;
+
+              const ux = dx / dist;
+              const uy = dy / dist;
+
+              // Offset arrow slightly from node borders (node radius = 22)
+              const startX = uNode.x + ux * 23;
+              const startY = uNode.y + uy * 23;
+              const endX = vNode.x - ux * 26;
+              const endY = vNode.y - uy * 26;
+
+              return (
+                <g key={`dir-path-${uId}-${vId}-${idx}`}>
+                  {/* Directional Path Arrow Line */}
+                  <line
+                    x1={startX}
+                    y1={startY}
+                    x2={endX}
+                    y2={endY}
+                    stroke="#34D399"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    markerEnd="url(#path-arrow)"
+                    filter="url(#glow-green)"
+                  />
+
+                  {/* Traveling Luminous Energy Particle */}
+                  <circle r="4.5" fill="#6EE7B7" filter="url(#glow-green)">
+                    <animateMotion
+                      path={`M ${startX} ${startY} L ${endX} ${endY}`}
+                      dur="1.2s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                </g>
+              );
+            })}
+        </g>
+
+        {/* 3. NODES LAYER */}
         <g id="nodes">
           {nodes.map((node) => {
             const isSource = node.id === sourceNodeId;
@@ -160,6 +245,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             const isCurrent = node.id === currentNodeId;
             const isVisited = visitedNodeIds?.has(node.id) ?? false;
             const isCandidate = candidateNodeIds?.has(node.id) ?? false;
+            const isInReconstructed = reconstructedPath.includes(node.id);
             const dist = distances?.[node.id];
             const distLabel = dist === undefined || dist === null || dist === Infinity ? '∞' : dist.toString();
 
@@ -172,9 +258,13 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               circleFill = '#0F766E'; // teal-700
               circleStroke = '#2DD4BF'; // teal-400
               strokeWidth = 4;
-            } else if (isVisited) {
+            } else if (isInReconstructed) {
               circleFill = '#065F46'; // emerald-800
               circleStroke = '#34D399'; // emerald-400
+              strokeWidth = 4;
+            } else if (isVisited) {
+              circleFill = '#064E3B'; // dark emerald
+              circleStroke = '#10B981'; // emerald-500
               strokeWidth = 3;
             } else if (isCandidate) {
               circleFill = '#0369A1'; // sky-700
@@ -271,6 +361,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             );
           })}
         </g>
+
+        {/* 4. SPARK EFFECTS LAYER */}
+        {sparkTargetNode && (
+          <SparkEffect
+            x={sparkTargetNode.x}
+            y={sparkTargetNode.y}
+            active={true}
+            onComplete={onSparkComplete}
+          />
+        )}
       </svg>
 
       {/* Legend Footer */}
@@ -282,7 +382,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-            Visited / Finalized
+            Finalized / Visited
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
@@ -291,8 +391,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         </div>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
-            <span className="w-4 h-1 bg-emerald-500 rounded"></span>
-            Shortest Path Tree
+            <span className="w-4 h-1 bg-emerald-400 rounded"></span>
+            Directional Path & Particle
           </span>
           <span className="text-slate-400">Click nodes or edges to execute steps</span>
         </div>
