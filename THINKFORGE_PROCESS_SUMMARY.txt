@@ -145,68 +145,62 @@ Typography:
 - Avoids fake vanity metrics; displays raw evidence of student independence.
 
 ================================================================================
-5. ALGORITHM ARENA — INTERACTIVE MINI-GAME INTEGRATION
+5. ALGORITHM ARENA 2.0 — ANIMATED GAME SUITE & BENCHMARK LAB
 ================================================================================
-5.1. Overview & Pedagogical Purpose
-Integrated directly into ThinkForge under the navigation bar and hero section:
-- Tagline: "Think Strategically. Solve Algorithmically."
-- Teaches graph traversal, edge relaxation, and greedy decision-making through interactive play.
+5.1. Overview & Game World Architecture
+Algorithm Arena 2.0 upgrades the laboratory into an animated, gamified learning 
+universe featuring the friendly PathPup mascot, penguin characters, and real 
+interactive algorithm mechanics.
+- Primary Tagline: "Think Strategically. Solve Algorithmically."
+- Core Games:
+  1. Dijkstra's Path Adventure (Graph traversal with directional animated arrows)
+  2. Bubble Sort: Penguin Parade (Adjacent swap mechanics & early-exit detection)
+  3. Selection Sort: Penguin Champion (Minimum scanner & placement swaps)
+  4. Sorting Showdown: Comparison Lab (Synchronized live head-to-head simulations)
 
-5.2. Game Mode A: Dijkstra's Path Challenge
-- Displays weighted graphs (5 to 9 nodes) with clearly readable weights.
-- Player selects the source node (dist = 0) and unvisited candidate with minimum distance.
-- Player relaxes outgoing edges to update tentative distances and predecessors in real time.
-- Finalizes nodes once all outgoing edges have been explored.
-- Invariant rules prevent selecting invalid unvisited nodes or finalized nodes.
+5.2. Game One: Dijkstra's Path Adventure
+- Directional Animated SVG Arrows:
+  * Uses SVG markers and trigonometry offsets (radii ~22px) to point accurately from 
+    current to next node along graph edges.
+  * Native SVG <animateMotion> renders a glowing luminous particle traveling along 
+    each path edge.
+  * Destination nodes illuminate and emit starburst sparks upon arrival (SparkEffect.tsx).
+- Friendly Dog Mascot Companion (PathPup.tsx):
+  * Expressive states: idle, thinking, happy (wagging/bouncing on correct moves), 
+    sad (drooping ears and encouragement on mistakes), celebrating (party hat & victory pose).
+- Interactive 2-Phase Solving Workflow:
+  * Phase 1: Exploration, greedy node activation, and edge relaxation.
+  * Phase 2: Shortest path reconstruction with "⚡ Auto-Trace from Table", Undo, and Clear.
+  * Incomplete path guard prevents premature submission errors.
 
-5.3. Game Mode B: Build the Algorithm
-- Presents 7 shuffled algorithm steps:
-  * Initialize source distance to 0, all others to infinity
-  * Select unvisited node with minimum tentative distance
-  * Examine all unvisited neighbors of the active node
-  * Calculate tentative distance through active node
-  * Relax edge if smaller distance is discovered
-  * Mark current node as finalized/visited
-  * Repeat until target is finalized, then reconstruct path
-- Player reorders steps using Move Up / Move Down buttons; system validates the sequence.
+5.3. Game Two: Bubble Sort — Penguin Parade (BubbleSortGame.tsx)
+- Penguins with heights proportional to array values (e.g., [5, 2, 4, 1, 3]).
+- Three Interactive Modes:
+  * Mode A: Play the Sort (Student chooses "Swap" vs "Keep Order" with validation).
+  * Mode B: Predict the Next Move (Interactive quiz on upcoming comparison/swap pairs).
+  * Mode C: Watch and Learn (Playback with Play, Pause, Step Forward/Back, Speed controls).
+- Visual sorted suffix lock after each pass.
+- Early exit optimization: O(n) best-case termination when a pass makes zero swaps.
 
-5.4. Game Mode C: Edge Selection Challenge
-- Decision-making graph puzzles testing algorithmic judgment:
-  * Identifying the next valid edge to relax
-  * Finding edges that cannot belong to the shortest path tree
-  * Selecting the next node to finalize
+5.4. Game Three: Selection Sort — Penguin Champion (SelectionSortGame.tsx)
+- Visualizes scanning the unsorted array to find the minimum penguin.
+- Highlights candidate minimum penguin in emerald with a "MIN" crown badge.
+- Compares candidates in cyan and performs exactly one placement swap per pass.
+- Educational explanation of why Selection Sort performs at most n - 1 swaps total.
 
-5.5. Interactive SVG Graph Canvas & Live Distance Table
-- Custom SVG canvas (GraphCanvas.tsx) featuring:
-  * Node circles with status coloring (Teal = Active, Emerald = Finalized, Sky = Candidate)
-  * Active node pulsing aura animation
-  * Clickable weighted edges with highlighted shortest path tree
-- Live Distance Table (DistanceTable.tsx) featuring:
-  * Real-time columns: Node, Tentative Distance, Predecessor, Status badge
-  * Status badges: Active (pulse), Finalized (check), Candidate (clock), Unvisited
+5.5. Game Four: Sorting Showdown — Comparison Lab (SortingComparison.tsx)
+- Synchronized side-by-side simulation running Bubble Sort and Selection Sort on 
+  the exact same initial array.
+- Live telemetry comparing operation counts, swaps, and passes.
+- Algorithmic specification table (Best, Average, Worst time, Auxiliary Space, 
+  Stability, Swap behavior).
+- Socratic reflection prompt testing student comprehension of swap vs scan mechanics.
 
-5.6. Two-Phase Path Solving Workflow & Auto-Trace Engine
-- Phase 1: Interactive Edge Relaxation & Distance Table population.
-- Phase 2: Shortest Path Reconstruction:
-  * Dedicated Step 2 Path Reconstruction card with live sequence badges:
-    Sequence: [ A ] -> [ C ] -> [ B ] -> [ D ] -> [ E ]
-  * "⚡ Auto-Trace from Table": Traces backwards from target via predecessor pointers 
-    (E <- D <- B <- C <- A) and automatically completes the sequence.
-  * Undo & Clear controls to modify node clicks.
-  * Incomplete Path Guard: Prevents accidental submission when sequence is incomplete.
-
-5.7. Difficulty Progression & Graph Datasets
-- Easy (5 nodes: A, B, C, D, E | Source: A, Target: E | Optimal: A->C->B->D->E, Cost: 10)
-- Medium (7 nodes: A, B, C, D, E, F, G | Source: A, Target: G | Optimal: A->B->E->G, Cost: 10)
-- Hard (9 nodes: A through I | Source: A, Target: I | Optimal: A->C->F->H->I, Cost: 15)
-
-5.8. Scoring & High Score Engine
-- +10 points for successful edge relaxation
-- +5 points for finalizing a node
-- +30 points for submitting the correct shortest path
-- Up to +20 points efficiency bonus for solving with minimal errors
-- -5 points penalty for hints
-- High scores persisted in browser LocalStorage by difficulty tier.
+5.6. Pure Algorithmic Engine & Visualization Library
+- sortingAlgorithms.ts: Pure deterministic trace generators for Bubble & Selection sort.
+- PenguinArray.tsx: Inline SVG penguin characters with proportional heights and badges.
+- SparkEffect.tsx: Non-blocking SVG/CSS starburst particle emitter.
+- PathPup.tsx: Vector character mascot with dynamic speech bubble feedback.
 
 ================================================================================
 6. FILE-BY-FILE ARCHITECTURAL DIRECTORY TREE
@@ -256,7 +250,8 @@ ThinkForge/
         │   └── useFocusMonitor.ts
         ├── lib/
         │   ├── ragService.ts
-        │   └── graphAlgorithms.ts
+        │   ├── graphAlgorithms.ts
+        │   └── sortingAlgorithms.ts
         └── components/
             ├── Header.tsx
             ├── HeroSection.tsx
@@ -271,7 +266,13 @@ ThinkForge/
             └── arena/
                 ├── AlgorithmArena.tsx
                 ├── GraphCanvas.tsx
-                └── DistanceTable.tsx
+                ├── DistanceTable.tsx
+                ├── PathPup.tsx
+                ├── SparkEffect.tsx
+                ├── PenguinArray.tsx
+                ├── BubbleSortGame.tsx
+                ├── SelectionSortGame.tsx
+                └── SortingComparison.tsx
 
 ================================================================================
 7. DIAGNOSED ISSUES, ROOT CAUSES & RESOLUTIONS
