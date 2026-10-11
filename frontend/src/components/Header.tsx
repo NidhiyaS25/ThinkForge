@@ -5,8 +5,8 @@ import { Timer } from './Timer';
 import { ShieldCheck, ShieldAlert, BookOpen, GraduationCap, Sparkles, User } from 'lucide-react';
 
 interface HeaderProps {
-  currentView: 'hero' | 'workspace' | 'teacher' | 'profile';
-  onNavigate: (view: 'hero' | 'workspace' | 'teacher' | 'profile') => void;
+  currentView: 'hero' | 'workspace' | 'teacher' | 'profile' | 'arena';
+  onNavigate: (view: 'hero' | 'workspace' | 'teacher' | 'profile' | 'arena') => void;
   isFocused?: boolean;
   violationCount?: number;
   timerSeconds?: number;
@@ -114,6 +114,18 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             Independence Profile
+          </button>
+
+          <button
+            onClick={() => onNavigate('arena')}
+            className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+              currentView === 'arena'
+                ? 'bg-gradient-to-r from-emerald-800 to-teal-800 text-white font-bold shadow-xs'
+                : 'text-emerald-900 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/70 font-semibold'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Algorithm Arena</span>
           </button>
 
           {currentView === 'hero' ? (

@@ -7,12 +7,14 @@ interface HeroSectionProps {
   onStartLearning: () => void;
   onExploreHowItWorks: () => void;
   onOpenTeacherDashboard: () => void;
+  onOpenArena?: () => void;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
   onStartLearning,
   onExploreHowItWorks,
-  onOpenTeacherDashboard
+  onOpenTeacherDashboard,
+  onOpenArena
 }) => {
   return (
     <div className="relative overflow-hidden bg-[#FAF9F5] text-slate-900 min-h-[92vh] flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -242,6 +244,38 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Algorithm Arena Feature Card Showcase */}
+      {onOpenArena && (
+        <div className="max-w-7xl mx-auto w-full mt-14 pt-8 border-t border-slate-200/80">
+          <div className="bg-gradient-to-r from-[#0F2E2E] via-[#113A35] to-[#1F5F50] rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden group">
+            <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-emerald-400/5 blur-2xl pointer-events-none" />
+
+            <div className="space-y-2 relative z-10">
+              <div className="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-3 py-1 rounded-full text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Interactive Mini-Game</span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-serif font-bold text-white">
+                Algorithm Arena
+              </h3>
+              <p className="text-emerald-100/80 text-xs sm:text-sm max-w-xl leading-relaxed">
+                <em>Think Strategically. Solve Algorithmically.</em> Master Dijkstra's pathfinding, graph edge relaxations, and algorithmic sequencing through real-time puzzle challenges.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0 relative z-10">
+              <button
+                onClick={onOpenArena}
+                className="inline-flex items-center gap-2 bg-[#64D8B8] hover:bg-[#52cba9] text-[#0A2328] px-7 py-3.5 rounded-full font-bold text-sm shadow-lg shadow-emerald-950/20 transition-all hover:scale-105 cursor-pointer"
+              >
+                <span>Play Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

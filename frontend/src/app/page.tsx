@@ -10,8 +10,10 @@ import { DefenseBanner } from '../components/DefenseBanner';
 import { IndependentChallenge } from '../components/IndependentChallenge';
 import { TeacherDashboard } from '../components/TeacherDashboard';
 import { IndependenceProfile } from '../components/IndependenceProfile';
+import { AlgorithmArena } from '../components/arena/AlgorithmArena';
 import { useFocusMonitor } from '../hooks/useFocusMonitor';
 import { ragService } from '../lib/ragService';
+import { Compass } from 'lucide-react';
 import {
   Assignment,
   CourseDocument,
@@ -22,7 +24,7 @@ import {
 } from '../types';
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'hero' | 'workspace' | 'teacher' | 'profile'>('workspace');
+  const [currentView, setCurrentView] = useState<'hero' | 'workspace' | 'teacher' | 'profile' | 'arena'>('workspace');
 
   // Anti-Cheat Focus Monitor Hook
   const { isActive, violationCount, statusMessage } = useFocusMonitor({
@@ -304,7 +306,12 @@ export default function Home() {
             onStartLearning={() => setCurrentView('workspace')}
             onExploreHowItWorks={() => setCurrentView('workspace')}
             onOpenTeacherDashboard={() => setCurrentView('teacher')}
+            onOpenArena={() => setCurrentView('arena')}
           />
+        )}
+
+        {currentView === 'arena' && (
+          <AlgorithmArena onBack={() => setCurrentView('workspace')} />
         )}
 
         {currentView === 'teacher' && (
@@ -327,6 +334,36 @@ export default function Home() {
 
         {currentView === 'workspace' && (
           <div className="max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8 space-y-6">
+            {/* Algorithm Arena Quick Entry Banner */}
+            <div className="bg-gradient-to-r from-[#0F2E2E] via-[#113A35] to-[#1F5F50] rounded-2xl p-4 sm:p-5 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-300 shrink-0">
+                  <Compass className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-serif font-bold text-sm sm:text-base tracking-wide">
+                      Algorithm Arena: Dijkstra's Path Challenge
+                    </span>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+                      Mini-Game
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-100/80 mt-0.5 leading-relaxed">
+                    Think Strategically. Solve Algorithmically. Master shortest paths, edge relaxations, and algorithm sequences.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setCurrentView('arena')}
+                className="inline-flex items-center gap-2 bg-[#64D8B8] hover:bg-[#52cba9] text-[#0A2328] px-5 py-2.5 rounded-xl font-bold text-xs shadow-md transition-all hover:scale-105 shrink-0 cursor-pointer"
+              >
+                <span>Play Arena</span>
+                <span className="text-sm">→</span>
+              </button>
+            </div>
+
             {/* Defense Required Alert Banner (When anti-cheat anomaly is flagged) */}
             {isDefenseMode && (
               <DefenseBanner
