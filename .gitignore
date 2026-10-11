@@ -1,0 +1,38 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+.next/
+out/
+coverage/
+
+# Local app data and uploads
+backend/data/
+data/
+chroma/
+*.db
+*.sqlite
+*.sqlite3
+uploads/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
