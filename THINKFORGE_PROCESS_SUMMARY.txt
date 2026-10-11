@@ -1,0 +1,233 @@
+================================================================================
+THINKFORGE (SOCRATICLMS) — COMPLETE END-TO-END EXECUTION & PROCESS SUMMARY REPORT
+================================================================================
+Date: October 11, 2026
+Repository: https://github.com/NidhiyaS25/ThinkForge
+Project: ThinkForge — AI-Powered Learning for Independent Thinkers
+Tagline: "Don't replace thinking. Forge it."
+Supporting Brand Line: "An AI that trains you to need it less."
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. EXECUTIVE PROJECT OVERVIEW
+2. REQUIREMENT SPECIFICATIONS & SYSTEM ARCHITECTURE
+3. DESIGN SYSTEM & HERO REFERENCE ALIGNMENT
+4. TECH STACK & FILE-BY-FILE IMPLEMENTATION MAP
+5. CORE COMPONENT & SERVICE HIGHLIGHTS
+   5.1. Focus Lock & Window Tracking (useFocusMonitor.ts)
+   5.2. Pacing Controller & Dynamic Timer (Timer.tsx)
+   5.3. Socratic Interrogator & Progressive Mentor (SocraticChat.tsx)
+   5.4. Visual Knowledge Graph (KnowledgeGraph.tsx)
+   5.5. Interactive Assessment Workspace & Page Layout (page.tsx)
+   5.6. AI-Disabled Transfer Challenge (IndependentChallenge.tsx)
+   5.7. Teacher Management & Independence Profile
+   5.8. Backend Services & RAG Vector Engine
+6. LOCAL RUNTIME CONFIGURATION & RESOLUTION
+7. TESTING, VALIDATION & LIVE DEPLOYMENT
+8. GIT INITIALIZATION & GITHUB SYNCHRONIZATION
+9. CURRENT SYSTEM STATUS & VERIFICATION LOG
+
+================================================================================
+1. EXECUTIVE PROJECT OVERVIEW
+================================================================================
+ThinkForge is an educational technology platform and anti-cheat learning management 
+system designed to solve a critical flaw in modern AI education: student dependency 
+on instant AI answers.
+
+Unlike typical chatbots that act as answer vending machines, ThinkForge enforces:
+1. Attempt-Before-Hint: Students must commit an initial answer before AI guidance is 
+   unlocked.
+2. Progressive Socratic Fading: AI guidance follows 3 structured levels:
+   - Level 1: Clarifying Question
+   - Level 2: Conceptual Hint (grounded in course notes)
+   - Level 3: Partial Scaffolding Outline (leaving final synthesis to the learner)
+3. Socratic Defense Interrogation: If submissions are flagged as suspiciously fast, 
+   generic, or interrupted by tab-switches, the UI enters "DEFENSE REQUIRED" mode, 
+   requiring the student to explain intermediate execution steps.
+4. AI-Disabled Independent Transfer: Authentic mastery is measured through a related 
+   transfer problem where all AI assistance is completely locked.
+
+================================================================================
+2. REQUIREMENT SPECIFICATIONS & SYSTEM ARCHITECTURE
+================================================================================
+The project was designed with a decoupled full-stack architecture:
+
+- Frontend: Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Lucide Icons, 
+  and Framer Motion.
+- Backend: Python 3.13, FastAPI REST API, Uvicorn ASGI server, SQLAlchemy ORM, and 
+  SQLite embedded database.
+- Course Knowledge & RAG Layer: PyMuPDF (fitz) page-by-page PDF extraction, 400-word 
+  sliding window chunking, SentenceTransformers (all-MiniLM-L6-v2) local 384-d dense 
+  embeddings, ChromaDB persistent vector storage, and Google GenAI SDK (Gemini) with 
+  deterministic fallback.
+- State & Telemetry: Custom React hooks tracking window focus, blur, and tab switching 
+  in real-time.
+
+================================================================================
+3. DESIGN SYSTEM & HERO REFERENCE ALIGNMENT
+================================================================================
+The user provided a visual reference image (ThinkForge hero section and split workspace 
+card). The entire frontend was built to strictly match this visual identity:
+
+- Color Tokens:
+  - Deep Navy/Dark Teal: #0F2E2E, #113A35
+  - Forest Green / Teal Accents: #1F5F50, #2E7A68, #40916C
+  - Background: Warm Off-White / Cream (#FAF9F5, #FAF8F5)
+  - Surface Cards: #FFFFFF with subtle borders (#E2E8F0) and soft realistic shadows
+- Typography:
+  - Headlines: Newsreader / Editorial Serif
+  - UI Controls: Plus Jakarta Sans / Modern Sans
+  - Code Editor: Monospace with line numbering (1 to 7)
+- Hero Components:
+  - Overline: "— BUILD INDEPENDENT THINKERS"
+  - Headline: "Don't Replace Thinking. Forge It." (with "Forge It." in forest green)
+  - Split Workspace Mockup Card: Sidebar navigation ("My Learning", "Assignments", 
+    "Study Materials", "Progress"), code editor ("Understanding Recursion"), AI Mentor 
+    card with citation pill ("Course Notes - Page 12 >"), and Independent Challenge card.
+
+================================================================================
+4. TECH STACK & FILE-BY-FILE IMPLEMENTATION MAP
+================================================================================
+The project was modularly structured into 44 clean source files:
+
+ROOT:
+- .gitignore                      : Excludes secrets (.env), .venv, node_modules, .next, and data
+- .env.example                    : Safe template for environment variables
+- README.md                       : Comprehensive architecture and tech stack guide
+- Agents.md                       : Product specifications and rules
+- THINKFORGE_PROCESS_SUMMARY.txt  : Complete execution record
+
+BACKEND (backend/):
+- backend/.env.example            : Backend environment template
+- backend/.env                    : Local configuration (ignored by git)
+- backend/requirements.txt        : Python dependencies (FastAPI, Uvicorn, SQLAlchemy, etc.)
+- backend/app/main.py             : FastAPI entrypoint with CORS & startup seeding
+- backend/app/core/config.py      : Pydantic Settings configuration
+- backend/app/db/session.py       : SQLAlchemy SQLite session factory
+- backend/app/db/init_db.py       : Database initialization and CS 101 seed data
+- backend/app/models/models.py    : SQLAlchemy models (Course, Assignment, Attempt, KnowledgeNode)
+- backend/app/schemas/schemas.py  : Pydantic request & response schemas
+- backend/app/api/routes.py       : REST API routes (/api/attempts, /api/mentor/hint, etc.)
+- backend/app/services/pdf_extraction.py   : PyMuPDF PDF parser preserving page numbers
+- backend/app/services/chunking.py         : 400-word text chunker with overlap
+- backend/app/services/vector_store.py     : ChromaDB & MiniLM embedding store
+- backend/app/services/rag_evaluator.py    : Anti-cheat pacing & defense evaluator
+- backend/app/services/socratic_mentor.py  : Progressive Level 1/2/3 hint generator
+- backend/app/services/scoring.py          : Deterministic rubric scorer
+- backend/tests/test_api.py       : Automated test suite
+
+FRONTEND (frontend/):
+- frontend/package.json           : Next.js, React, Tailwind, Lucide dependencies
+- frontend/tsconfig.json          : TypeScript compiler options
+- frontend/tailwind.config.js     : Custom ThinkForge brand palette
+- frontend/postcss.config.js      : PostCSS configuration
+- frontend/next.config.mjs        : Next.js settings
+- frontend/src/types/index.ts     : TypeScript domain types
+- frontend/src/app/globals.css    : Tailwind directives & Google Fonts
+- frontend/src/app/layout.tsx     : Next.js root layout with typography
+- frontend/src/app/page.tsx       : Main assessment dashboard coordinating all modules
+- frontend/src/hooks/useFocusMonitor.ts            : Anti-cheat window tracking hook
+- frontend/src/components/Timer.tsx               : Dynamic pacing controller
+- frontend/src/components/SocraticChat.tsx        : AI dialog & interrogation interface
+- frontend/src/components/KnowledgeGraph.tsx      : Visual concept verification map
+- frontend/src/components/AssignmentViewer.tsx    : Left column code editor & rubric
+- frontend/src/components/DefenseBanner.tsx       : Socratic defense warning banner
+- frontend/src/components/IndependentChallenge.tsx: AI-disabled transfer challenge
+- frontend/src/components/HeroSection.tsx         : ThinkForge hero presentation
+- frontend/src/components/Header.tsx              : Brand bar with live focus badge
+- frontend/src/components/TeacherDashboard.tsx    : PDF upload & assignment creator
+- frontend/src/components/IndependenceProfile.tsx : Transparent evidence audit trail
+- frontend/src/lib/ragService.ts                  : Client API abstraction with fallbacks
+
+================================================================================
+5. CORE COMPONENT & SERVICE HIGHLIGHTS
+================================================================================
+5.1. useFocusMonitor.ts (Custom Hook)
+- Listens to document visibilitychange, window blur, and focus events.
+- Flags violations whenever the student minimizes the window or switches tabs.
+- Increments violationCount and emits telemetry to the parent workspace.
+
+5.2. Timer.tsx (Pacing Controller)
+- Calculates expected time dynamically based on algorithmic complexity (intermediate = 420s).
+- Renders MM:SS countdown with dynamic color state transitions (emerald -> amber -> rose).
+- Penalizes timer by 30 seconds for every focus violation.
+
+5.3. SocraticChat.tsx (Socratic Dialogue & Interrogation)
+- Renders progressive assistance pills: L1 (Clarifying), L2 (Conceptual), L3 (Outline).
+- Shows citation chips: "Course Notes - Page 12 >".
+- Switches to Socratic Interrogator when an integrity anomaly is detected, prompting:
+  "Defense Required: In your implementation, what exact memory state change occurs 
+  when n == 0 is evaluated? Walk through the return sequence from factorial(1) to factorial(n)."
+
+5.4. KnowledgeGraph.tsx (Concept Verification Map)
+- Visualizes key concept nodes:
+  - Base Case Formulation (Verified)
+  - Recursive Sub-problem (Verified)
+  - Call Stack Unwinding (Pending Defense -> Defense Required -> Verified)
+  - Edge Case Guard Rails (Pending)
+- Dynamically flips to "Verified" when the student passes Socratic interrogation.
+
+5.5. AssignmentViewer.tsx & page.tsx
+- Rich editor with line numbers, character count, and revision versioning (Attempt v1, v2).
+- Enforces initial attempt submission before hints unlock.
+- Includes a metacognitive reasoning reflection input.
+
+5.6. IndependentChallenge.tsx
+- Presents related transfer challenge ("Pure recursive fibonacci(n) without loops").
+- Displays high-visibility "AI Disabled" badge.
+- Scores responses deterministically against expected boundary criteria.
+
+================================================================================
+6. LOCAL RUNTIME CONFIGURATION & RESOLUTION
+================================================================================
+During setup on the Windows environment, several environmental hurdles were 
+diagnosed and resolved:
+1. Python Runtime: Located existing Python 3.13 at 
+   C:\Users\niran\AppData\Local\Programs\Python\Python313\python.exe.
+2. Node.js & npm: Portable Node.js v20.18.0 and npm 10.8.2 were downloaded and extracted 
+   to C:\Users\niran\AppData\Local\Programs\nodejs.
+3. System Environment PATH: Both Python and Node.js were appended to the user PATH.
+4. Port Conflict on 8000: Diagnosed a stale background Python process bound to port 8000; 
+   safely terminated it and cleanly launched Uvicorn.
+5. HuggingFace Model Weights: Initialized SentenceTransformers and cached all-MiniLM-L6-v2 
+   embeddings locally.
+
+================================================================================
+7. TESTING, VALIDATION & LIVE DEPLOYMENT
+================================================================================
+- Backend Server: Live on http://127.0.0.1:8000 (Health check 200 OK).
+- Interactive OpenAPI Console: Live on http://127.0.0.1:8000/docs.
+- Frontend Application: Live on http://localhost:3000 (HTTP 200 OK).
+- Backend Automated Tests (backend/tests/test_api.py):
+  * test_health_check (PASSED)
+  * test_chunking_metadata_preservation (PASSED)
+  * test_mentor_progressive_hint_levels (PASSED)
+  * test_anti_cheat_evaluation_and_defense_trigger (PASSED)
+  * test_socratic_defense_verification (PASSED)
+  * test_deterministic_transfer_scoring (PASSED)
+  * test_get_assignments_and_independence_profile (PASSED)
+
+================================================================================
+8. GIT INITIALIZATION & GITHUB SYNCHRONIZATION
+================================================================================
+1. Addressed Root Git Trap: Detected that the user's home directory had an unintended 
+   parent .git folder; initialized an isolated, clean Git repository directly inside 
+   the ThinkForge workspace.
+2. Secret & Build Hygiene: Verified with git status --ignored that .env, backend/.env, 
+   .venv, node_modules, and .next were strictly excluded.
+3. Initial Commit: Committed 44 files (6,403 lines of code) with commit message:
+   "feat: initial commit for ThinkForge (SocraticLMS) prototype" (0be5984).
+4. Remote Configuration: Linked remote origin to:
+   https://github.com/NidhiyaS25/ThinkForge.git
+5. Authentication & Push: Handled GitHub authentication via Git Credential Manager, 
+   resolved upstream empty README conflict, and force-updated main branch.
+
+================================================================================
+9. CURRENT SYSTEM STATUS & VERIFICATION LOG
+================================================================================
+- GitHub Status: Remote repository is 100% in sync with commit 0be5984.
+- Remote URL: https://github.com/NidhiyaS25/ThinkForge
+- Local Servers: Both Frontend (port 3000) and Backend (port 8000) are running.
+- Readiness: The project is fully demonstrable, runnable, and ready for evaluation.
+================================================================================
