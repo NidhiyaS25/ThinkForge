@@ -394,9 +394,83 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
     }
   };
 
+  // Clear reconstructed path
+  const handleClearPath = () => {
+    setReconstructedPath([challenge.source]);
+    setPathEdgeIds(new Set());
+    setGuidanceMessage({
+      type: 'info',
+      text: `Path sequence reset to [${challenge.source}]. Click nodes on the graph to build the shortest path to ${challenge.destination}.`
+    });
+  };
+
+  // Undo last node in path sequence
+  const handleUndoPathNode = () => {
+    if (reconstructedPath.length <= 1) return;
+    const newPath = reconstructedPath.slice(0, -1);
+    setReconstructedPath(newPath);
+
+    const edgesSet = new Set<string>();
+    for (let i = 0; i < newPath.length - 1; i++) {
+      const u = newPath[i];
+      const v = newPath[i + 1];
+      const edge = challenge.edges.find((e) => (e.u === u && e.v === v) || (e.u === v && e.v === u));
+      if (edge) edgesSet.add(edge.id);
+    }
+    setPathEdgeIds(edgesSet);
+  };
+
+  // Auto-trace path backwards from target using the predecessor table
+  const handleAutoTracePath = () => {
+    const path: string[] = [];
+    let curr: string | null = challenge.destination;
+    const visitedSet = new Set<string>();
+
+    while (curr && !visitedSet.has(curr)) {
+      path.unshift(curr);
+      visitedSet.add(curr);
+      if (curr === challenge.source) break;
+      curr = previous[curr] || null;
+    }
+
+    if (path.length > 0 && path[0] === challenge.source) {
+      setReconstructedPath(path);
+      const edgesSet = new Set<string>();
+      for (let i = 0; i < path.length - 1; i++) {
+        const u = path[i];
+        const v = path[i + 1];
+        const edge = challenge.edges.find((e) => (e.u === u && e.v === v) || (e.u === v && e.v === u));
+        if (edge) edgesSet.add(edge.id);
+      }
+      setPathEdgeIds(edgesSet);
+      setGuidanceMessage({
+        type: 'success',
+        text: `Path auto-traced from your Predecessor table: ${path.join(' → ')}. Click Submit Shortest Path (+30) to finish!`
+      });
+    } else {
+      setGuidanceMessage({
+        type: 'warning',
+        text: `Predecessor pointers from ${challenge.destination} do not connect back to ${challenge.source}. Make sure all edges were relaxed.`
+      });
+    }
+  };
+
   // Submit Shortest Path
   const handleSubmitPath = () => {
     const optimal = fullDijkstra.current.optimalPath;
+
+    // Check if the user hasn't finished connecting to the destination node yet
+    if (
+      reconstructedPath.length < optimal.length ||
+      reconstructedPath[reconstructedPath.length - 1] !== challenge.destination
+    ) {
+      setGuidanceMessage({
+        type: 'warning',
+        text: `Path incomplete! You currently have: [${reconstructedPath.join(' → ')}]. Click the next nodes on the graph (${optimal.slice(reconstructedPath.length).join(' → ')}) to reach Target (${challenge.destination}), or click "Auto-Trace from Table"!`
+      });
+      return;
+    }
+
     const isCorrect =
       reconstructedPath.length === optimal.length &&
       reconstructedPath.every((val, index) => val === optimal[index]);
@@ -426,7 +500,7 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
       setScore((s) => Math.max(0, s - 5));
       setGuidanceMessage({
         type: 'error',
-        text: `Incorrect path! Expected optimal path: ${optimal.join(' → ')}. You submitted: ${reconstructedPath.join(' → ')}. Click Reset to try again.`
+        text: `Incorrect path sequence: ${reconstructedPath.join(' → ')}. Expected optimal path: ${optimal.join(' → ')}. Click "Clear Path" or "Auto-Trace from Table" to correct it!`
       });
     }
   };
@@ -747,29 +821,87 @@ export const AlgorithmArena: React.FC<AlgorithmArenaProps> = ({ onBack }) => {
                 interactive={!isCompleted}
               />
 
-              {/* Status Bar */}
-              <div className="bg-white rounded-xl border border-slate-200/80 p-3 flex flex-wrap items-center justify-between text-xs gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-700">Source:</span>
-                  <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded">
-                    {challenge.source} (dist: 0)
-                  </span>
-                  <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-semibold text-slate-700">Target:</span>
-                  <span className="bg-rose-100 text-rose-900 font-bold px-2 py-0.5 rounded">
-                    {challenge.destination} (target)
-                  </span>
-                </div>
+              {/* Status Bar & Path Reconstruction Card */}
+              {submittingPathMode && !isCompleted ? (
+                <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white rounded-2xl border border-emerald-500/40 p-4 shadow-md space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-7 h-7 rounded-xl bg-emerald-400 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                        2
+                      </span>
+                      <div>
+                        <h5 className="font-bold text-xs sm:text-sm text-emerald-100 flex items-center gap-2">
+                          Step 2: Reconstruct Shortest Path Sequence
+                        </h5>
+                        <p className="text-[11px] text-emerald-200/80">
+                          Click nodes in order on the graph, or click Auto-Trace from your table
+                        </p>
+                      </div>
+                    </div>
 
-                {submittingPathMode && (
-                  <div className="flex items-center gap-1.5 font-bold text-emerald-800">
-                    <span>Constructing Path:</span>
-                    <span className="bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-mono">
-                      {reconstructedPath.join(' → ') || 'Click nodes'}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleUndoPathNode}
+                        disabled={reconstructedPath.length <= 1}
+                        className="px-2.5 py-1 bg-white/10 hover:bg-white/20 disabled:opacity-30 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        Undo
+                      </button>
+                      <button
+                        onClick={handleClearPath}
+                        className="px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        Clear
+                      </button>
+                      <button
+                        onClick={handleAutoTracePath}
+                        className="px-3 py-1 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold rounded-lg text-xs shadow-sm cursor-pointer transition-all hover:scale-105 flex items-center gap-1.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Auto-Trace from Table</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sequence Badges */}
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-900/70 p-3 rounded-xl border border-emerald-500/20 text-xs font-mono">
+                    <span className="text-emerald-300 font-sans font-semibold text-[11px]">Sequence:</span>
+                    {reconstructedPath.map((nodeId, idx) => (
+                      <React.Fragment key={idx}>
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-500 text-slate-950 font-bold shadow-xs">
+                          {nodeId}
+                        </span>
+                        {idx < reconstructedPath.length - 1 && (
+                          <span className="text-emerald-400 font-sans font-bold">→</span>
+                        )}
+                      </React.Fragment>
+                    ))}
+
+                    {reconstructedPath[reconstructedPath.length - 1] !== challenge.destination && (
+                      <>
+                        <span className="text-emerald-400/60 font-sans font-bold">→</span>
+                        <span className="px-2.5 py-1 rounded-lg border border-dashed border-emerald-400/50 text-emerald-300 animate-pulse text-[11px] font-sans">
+                          Click Next Node on Graph
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200/80 p-3 flex flex-wrap items-center justify-between text-xs gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-700">Source:</span>
+                    <span className="bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded">
+                      {challenge.source} (dist: 0)
+                    </span>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="font-semibold text-slate-700">Target:</span>
+                    <span className="bg-rose-100 text-rose-900 font-bold px-2 py-0.5 rounded">
+                      {challenge.destination} (target)
                     </span>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Right 4 Cols: Live Distance Table & Algorithm Step Tracker */}
