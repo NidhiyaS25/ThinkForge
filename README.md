@@ -119,6 +119,10 @@ flowchart TD
 * **`components/Header.tsx`**: Navigation bar with real-time focus lock monitor badge (`● Active (Focus Locked)` vs `⚠ Focus Violation Detected`) and pacing timer.
 * **`components/TeacherDashboard.tsx`**: Course management suite for uploading text-based PDFs for RAG indexing and publishing assignments.
 * **`components/IndependenceProfile.tsx`**: Transparent evidence audit trail tracking attempt-before-hint diligence, hint count, focus flags, and unassisted transfer scores.
+* **`components/arena/AlgorithmArena.tsx`**: Fully playable educational mini-game featuring Dijkstra's Path Challenge, Build the Algorithm sequencing, and Edge Selection puzzles.
+* **`components/arena/GraphCanvas.tsx`**: Interactive SVG graph visualization with dynamic node states, edge relaxations, and shortest-path trees.
+* **`components/arena/DistanceTable.tsx`**: Real-time tabular tracking of tentative distances, predecessors, and finalized node statuses.
+* **`lib/graphAlgorithms.ts`**: Pure mathematical Dijkstra implementation, challenge graph datasets (Easy, Medium, Hard), step validators, and puzzle generators.
 * **`lib/ragService.ts`**: Resilient client-side API abstraction with automatic fallback.
 
 ### Backend Modules (`backend/app/`)
